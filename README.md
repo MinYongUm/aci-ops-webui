@@ -23,7 +23,7 @@ pip install -r requirements.txt
 ## 실행
 ```
 cd backend
-uvicorn main:app --reload --host 127.0.0.0 --port 8000
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 브라우저에서 `http://localhost:8000` 접속
