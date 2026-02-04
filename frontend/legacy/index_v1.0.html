@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACI Ops WebUI</title>
+    
+    <!-- Bootstrap CSS - 반응형 웹 디자인을 위한 CSS 프레임워크 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           기본 스타일 설정
+           ============================================ */
+        body { background-color: #f8f9fa; color: #333; }
+        
+        /* 카드 스타일 - 각 섹션을 감싸는 박스 */
+        .card { 
+            background-color: #fff; 
+            border: 1px solid #dee2e6; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        .card-header { 
+            background-color: #0d6efd; 
+            color: #fff; 
+            font-weight: bold; 
+        }
+        
+        /* 버튼 스타일 */
+        .btn-primary { background-color: #0d6efd; border-color: #0d6efd; }
+        .btn-primary:hover { background-color: #0b5ed7; border-color: #0b5ed7; }
+        
+        /* 네비게이션 바 스타일 */
+        .navbar { background-color: #212529; }
+        .navbar-brand { color: #fff !important; font-weight: bold; }
+        
+        /* 상단 통계 숫자 스타일 */
+        .stat-number { font-size: 2rem; font-weight: bold; color: #0d6efd; }
+        
+        /* 테이블 스타일 */
+        .table { color: #333; }
+        
+        /* 로딩 스피너 - 기본적으로 숨김 */
+        .loading { display: none; }
+        
+        /* ============================================
+           토폴로지 시각화 스타일
+           ============================================ */
+        .topology-container { padding: 20px; }
+        
+        /* Spine, Leaf 레이어 - Flexbox로 중앙 정렬 */
+        .spine-layer, .leaf-layer { 
+            display: flex; 
+            justify-content: center; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            margin: 20px 0; 
+        }
+        
+        /* 노드 박스 공통 스타일 */
+        .node-box { 
+            padding: 10px 15px; 
+            border-radius: 8px; 
+            text-align: center; 
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 100px;
+        }
+        
+        /* 노드 종류별 색상 */
+        .spine-node { background-color: #6f42c1; color: #fff; }      /* 보라색 - Spine */
+        .leaf-node { background-color: #20c997; color: #fff; }       /* 초록색 - Leaf */
+        .controller-node { background-color: #fd7e14; color: #fff; } /* 주황색 - Controller */
+        
+        /* 레이어 라벨 스타일 */
+        .layer-label { 
+            text-align: center; 
+            font-weight: bold; 
+            color: #666; 
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        /* 레이어 사이 연결선 */
+        .topology-line {
+            height: 3px;
+            background: linear-gradient(90deg, #6f42c1, #20c997);
+            margin: 15px 50px;
+            border-radius: 2px;
+        }
+        
+        /* 노드 상태 표시 - 테두리 색상으로 구분 */
+        .node-status-up { border: 3px solid #198754; }   /* 정상 - 초록 테두리 */
+        .node-status-down { border: 3px solid #dc3545; } /* 다운 - 빨간 테두리 */
+    </style>
+</head>
+<body>
+    <!-- ============================================
+         네비게이션 바
+         - 페이지 상단 고정 메뉴
+         - Refresh All 버튼으로 전체 데이터 새로고침
+         ============================================ -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">🖥️ ACI Ops WebUI</a>
+            <button class="btn btn-primary" onclick="loadAll()">🔄 Refresh All</button>
+        </div>
+    </nav>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <div class="container">
+        
+        <!-- ============================================
+             로딩 스피너
+             - 데이터 로드 중 표시
+             - JavaScript에서 display 속성 제어
+             ============================================ -->
+        <div id="loading" class="loading text-center mb-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">데이터를 불러오는 중...</p>
+        </div>
+
+        <!-- ============================================
+             상단 요약 카드 (Summary Row)
+             - 4개의 주요 지표를 한눈에 표시
+             - Total Faults, Security Risks, Endpoints, Nodes
+             ============================================ -->
+        <div class="row mb-4">
+            <!-- Total Faults 카드 -->
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Total Faults</h6>
+                        <div class="stat-number" id="total-faults">-</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Security Risks 카드 -->
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Security Risks</h6>
+                        <div class="stat-number" id="security-risks">-</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Total Endpoints 카드 -->
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Total Endpoints</h6>
+                        <div class="stat-number" id="total-endpoints">-</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Nodes Up 카드 -->
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Nodes Up</h6>
+                        <div class="stat-number" id="nodes-up">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             상세 정보 카드 - 첫 번째 행
+             - Health Check: Fault 상태 표시
+             - Policy Check: 보안 정책 검증 결과
+             ============================================ -->
+        <div class="row">
+            <!-- Health Check 카드 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">🏥 Health Check</div>
+                    <div class="card-body">
+                        <div id="health-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Policy Check 카드 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">🔒 Policy Check</div>
+                    <div class="card-body">
+                        <div id="policy-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             상세 정보 카드 - 두 번째 행
+             - Interface Monitor: 인터페이스 상태
+             - Endpoint Tracker: Endpoint 통계
+             ============================================ -->
+        <div class="row">
+            <!-- Interface Monitor 카드 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">🔌 Interface Monitor</div>
+                    <div class="card-body">
+                        <div id="interface-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoint Tracker 카드 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">📍 Endpoint Tracker</div>
+                    <div class="card-body">
+                        <div id="endpoint-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             상세 정보 카드 - 세 번째 행
+             - Audit Log: 설정 변경 이력
+             - Capacity Report: 용량 리포트
+             ============================================ -->
+        <div class="row">
+            <!-- Audit Log 카드 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">📋 Audit Log</div>
+                    <div class="card-body">
+                        <div id="audit-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Capacity Report 카드 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">📊 Capacity Report</div>
+                    <div class="card-body">
+                        <div id="capacity-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             토폴로지 뷰어 카드
+             - 전체 너비 사용 (col-12)
+             - Spine-Leaf 구조 시각화
+             ============================================ -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">🗺️ Topology Viewer</div>
+                    <div class="card-body">
+                        <div id="topology-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         JavaScript 섹션
+         - API 호출 및 데이터 렌더링 로직
+         ============================================ -->
+    <script>
+        /**
+         * 전체 데이터 로드 함수
+         * - /api/all 엔드포인트 호출
+         * - 모든 모듈 데이터를 한 번에 가져옴
+         */
+        async function loadAll() {
+            // 로딩 스피너 표시
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                // FastAPI 백엔드에서 전체 데이터 조회
+                const response = await fetch('/api/all');
+                const data = await response.json();
+                
+                // 상단 Summary 카드 업데이트
+                document.getElementById('total-faults').textContent = data.health.total_faults;
+                document.getElementById('security-risks').textContent = data.policy.security_risks;
+                document.getElementById('total-endpoints').textContent = data.endpoint.total;
+                document.getElementById('nodes-up').textContent = data.health.nodes.up;
+                
+                // 각 섹션별 렌더링 함수 호출
+                renderHealth(data.health);
+                renderPolicy(data.policy);
+                renderInterface(data.interface);
+                renderEndpoint(data.endpoint);
+                renderAudit(data.audit);
+                renderCapacity(data.capacity);
+                renderTopology(data.topology);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('데이터를 불러오는데 실패했습니다.');
+            }
+            
+            // 로딩 스피너 숨김
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        /**
+         * Health Check 데이터 렌더링
+         * @param {Object} data - health API 응답 데이터
+         */
+        function renderHealth(data) {
+            // Fault 심각도별 Badge 표시
+            let html = `
+                <p><strong>Fault Summary:</strong></p>
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <span class="badge bg-danger">Critical: ${data.severity.critical}</span>
+                    <span class="badge bg-warning text-dark">Major: ${data.severity.major}</span>
+                    <span class="badge bg-info">Minor: ${data.severity.minor}</span>
+                    <span class="badge bg-secondary">Warning: ${data.severity.warning}</span>
+                </div>
+            `;
+            
+            // Critical & Major Fault 상세 목록
+            if (data.critical_major.length > 0) {
+                html += `<p><strong>Critical & Major Faults:</strong></p><ul class="list-group">`;
+                data.critical_major.forEach(f => {
+                    // 심각도에 따라 Badge 색상 결정
+                    const badgeClass = f.severity === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark';
+                    html += `<li class="list-group-item d-flex align-items-center gap-2">
+                        <span class="badge ${badgeClass}">${f.severity}</span>
+                        <small>${f.description}</small>
+                    </li>`;
+                });
+                html += `</ul>`;
+            }
+            
+            // DOM에 렌더링
+            document.getElementById('health-content').innerHTML = html;
+        }
+
+        /**
+         * Policy Check 데이터 렌더링
+         * @param {Object} data - policy API 응답 데이터
+         */
+        function renderPolicy(data) {
+            // Tenant, Contract, Filter 개수 표시
+            let html = `
+                <div class="d-flex gap-3 mb-3">
+                    <span class="badge bg-primary">Tenants: ${data.total_tenants}</span>
+                    <span class="badge bg-primary">Contracts: ${data.total_contracts}</span>
+                    <span class="badge bg-primary">Filters: ${data.total_filters}</span>
+                </div>
+                <p><strong>Security Risks: <span class="text-danger">${data.security_risks}</span></strong></p>
+            `;
+            
+            // 위험한 Contract 목록 (최대 5개)
+            if (data.risky_contracts.length > 0) {
+                html += `<p><strong>Risky Contracts:</strong></p><ul class="list-group mb-2">`;
+                data.risky_contracts.slice(0, 5).forEach(c => {
+                    html += `<li class="list-group-item list-group-item-warning"><small>[${c.tenant}] ${c.name}</small></li>`;
+                });
+                html += `</ul>`;
+            }
+            
+            document.getElementById('policy-content').innerHTML = html;
+        }
+
+        /**
+         * Interface Monitor 데이터 렌더링
+         * @param {Object} data - interface API 응답 데이터
+         */
+        function renderInterface(data) {
+            // 인터페이스 Up/Down 개수 표시
+            let html = `
+                <div class="d-flex gap-3 mb-3">
+                    <span class="badge bg-primary">Total: ${data.total}</span>
+                    <span class="badge bg-success">Up: ${data.up}</span>
+                    <span class="badge bg-danger">Down: ${data.down}</span>
+                </div>
+                <p><strong>Down Reasons:</strong></p>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light"><tr><th>Reason</th><th>Count</th></tr></thead>
+                    <tbody>
+            `;
+            
+            // Down 원인별 카운트 테이블
+            data.down_reasons.slice(0, 5).forEach(r => {
+                html += `<tr><td>${r.reason}</td><td><span class="badge bg-secondary">${r.count}</span></td></tr>`;
+            });
+            html += `</tbody></table>`;
+            
+            document.getElementById('interface-content').innerHTML = html;
+        }
+
+        /**
+         * Endpoint Tracker 데이터 렌더링
+         * @param {Object} data - endpoint API 응답 데이터
+         */
+        function renderEndpoint(data) {
+            // Tenant별 Endpoint 개수 테이블
+            let html = `
+                <p>Total Endpoints: <strong class="text-primary">${data.total}</strong></p>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light"><tr><th>Tenant</th><th>Count</th></tr></thead>
+                    <tbody>
+            `;
+            
+            data.by_tenant.forEach(t => {
+                html += `<tr><td>${t.tenant}</td><td><span class="badge bg-primary">${t.count}</span></td></tr>`;
+            });
+            html += `</tbody></table>`;
+            
+            document.getElementById('endpoint-content').innerHTML = html;
+        }
+
+        /**
+         * Audit Log 데이터 렌더링
+         * @param {Object} data - audit API 응답 데이터
+         */
+        function renderAudit(data) {
+            // 변경 유형별 Badge 표시
+            let html = `
+                <p>Recent Changes: <strong>${data.total}</strong></p>
+                <div class="d-flex gap-2 mb-3">
+                    <span class="badge bg-success">Creation: ${data.actions.creation}</span>
+                    <span class="badge bg-warning text-dark">Modification: ${data.actions.modification}</span>
+                    <span class="badge bg-danger">Deletion: ${data.actions.deletion}</span>
+                </div>
+                <p><strong>By User:</strong></p>
+                <ul class="list-group">
+            `;
+            
+            // 사용자별 변경 횟수
+            data.by_user.forEach(u => {
+                html += `<li class="list-group-item d-flex justify-content-between">${u.user}<span class="badge bg-primary">${u.count}</span></li>`;
+            });
+            html += `</ul>`;
+            
+            document.getElementById('audit-content').innerHTML = html;
+        }
+
+        /**
+         * Capacity Report 데이터 렌더링
+         * @param {Object} data - capacity API 응답 데이터
+         */
+        function renderCapacity(data) {
+            // High Usage 노드 개수 표시
+            let html = `<p>High Usage Nodes (>=80%): <strong class="${data.high_usage_count > 0 ? 'text-danger' : 'text-success'}">${data.high_usage_count}</strong></p>`;
+            
+            // 정상 상태면 성공 메시지 표시
+            if (data.high_usage_count === 0) {
+                html += `<div class="alert alert-success">✅ All nodes within normal capacity.</div>`;
+            }
+            
+            // TCAM 사용량 테이블
+            html += `
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light"><tr><th>Node</th><th>Used</th><th>Capacity</th><th>Usage</th></tr></thead>
+                    <tbody>
+            `;
+            data.tcam.slice(0, 8).forEach(t => {
+                // 사용률에 따라 Badge 색상 결정 (80% 이상: 빨강, 50% 이상: 노랑, 그 외: 초록)
+                const pctClass = t.percentage >= 80 ? 'bg-danger' : (t.percentage >= 50 ? 'bg-warning' : 'bg-success');
+                html += `<tr>
+                    <td>${t.node}</td>
+                    <td>${t.used}</td>
+                    <td>${t.capacity}</td>
+                    <td><span class="badge ${pctClass}">${t.percentage}%</span></td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            
+            document.getElementById('capacity-content').innerHTML = html;
+        }
+
+        /**
+         * Topology Viewer 데이터 렌더링
+         * @param {Object} data - topology API 응답 데이터
+         * 
+         * Controller -> Spine -> Leaf 순으로 레이어 표시
+         * 각 노드는 박스 형태로 시각화
+         */
+        function renderTopology(data) {
+            // 토폴로지 컨테이너 시작
+            let html = `
+                <div class="topology-container">
+                    <!-- 상단 요약 Badge -->
+                    <div class="text-center mb-4">
+                        <span class="badge controller-node me-2">Controllers: ${data.summary.controllers}</span>
+                        <span class="badge spine-node me-2">Spines: ${data.summary.spines}</span>
+                        <span class="badge leaf-node">Leafs: ${data.summary.leafs}</span>
+                    </div>
+                    
+                    <!-- Controller 레이어 -->
+                    <div class="layer-label">🎛️ CONTROLLER LAYER</div>
+                    <div class="spine-layer">
+            `;
+            
+            // Controller 노드 박스 생성
+            data.controllers.forEach(c => {
+                // 상태에 따라 테두리 색상 결정
+                const statusClass = c.status === 'UP' ? 'node-status-up' : 'node-status-down';
+                html += `<div class="node-box controller-node ${statusClass}">${c.name}<br><small>ID: ${c.id}</small></div>`;
+            });
+            
+            html += `
+                    </div>
+                    
+                    <!-- Controller-Spine 연결선 -->
+                    <div class="topology-line"></div>
+                    
+                    <!-- Spine 레이어 -->
+                    <div class="layer-label">🔷 SPINE LAYER</div>
+                    <div class="spine-layer">
+            `;
+            
+            // Spine 노드 박스 생성
+            data.spines.forEach(s => {
+                const statusClass = s.status === 'UP' ? 'node-status-up' : 'node-status-down';
+                html += `<div class="node-box spine-node ${statusClass}">${s.name}<br><small>${s.model.substring(0, 12)}</small></div>`;
+            });
+            
+            html += `
+                    </div>
+                    
+                    <!-- Spine-Leaf 연결선 -->
+                    <div class="topology-line"></div>
+                    
+                    <!-- Leaf 레이어 -->
+                    <div class="layer-label">🟢 LEAF LAYER</div>
+                    <div class="leaf-layer">
+            `;
+            
+            // Leaf 노드 박스 생성
+            data.leafs.forEach(l => {
+                const statusClass = l.status === 'UP' ? 'node-status-up' : 'node-status-down';
+                html += `<div class="node-box leaf-node ${statusClass}">${l.name}<br><small>ID: ${l.id}</small></div>`;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('topology-content').innerHTML = html;
+        }
+
+        /**
+         * 페이지 로드 시 자동으로 데이터 로드
+         */
+        window.onload = loadAll;
+    </script>
+</body>
+</html>
