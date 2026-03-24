@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-03-24
+### Added
+- tests/test_api.py: pytest 기반 API 엔드포인트 단위 테스트 (ACIClient Mock 처리)
+- tests/conftest.py: pytest 사전 패치 설정 (config.yaml, StaticFiles 없이 실행)
+
+### Changed
+- README.md: 대시보드 스크린샷 추가
+
 ## [1.1.0] - 2026-02-04
 ### Added
 - 자동 새로고침 기능 (30초)
