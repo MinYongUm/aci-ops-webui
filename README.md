@@ -68,3 +68,7 @@ aci-ops-webui/
 - Python 3.12.2
 - FastAPI
 - Cisco ACI APIC
+
+## Screenshots
+
+![ACI Ops Dashboard](https://github.com/user-attachments/assets/6aa82319-4079-43e5-83fe-98b59d7ef88d)
