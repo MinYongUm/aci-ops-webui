@@ -33,8 +33,8 @@ name: CI
 on:
   push:
     branches:
-      - main          # main 브랜치 push 시 실행
-  pull_request:       # 모든 브랜치 PR 시 실행
+      - main
+  pull_request:
 
 # ============================================================
 # 잡(Job) 정의
@@ -42,7 +42,7 @@ on:
 jobs:
   lint-and-test:
     name: Lint and Test
-    runs-on: ubuntu-latest  # GitHub 제공 Ubuntu 러너 사용
+    runs-on: ubuntu-latest
 
     steps:
       # --------------------------------------------------------
@@ -61,13 +61,12 @@ jobs:
 
       # --------------------------------------------------------
       # Step 3: 의존성 설치
-      # requirements_dev.txt → requirements.txt 포함하여 일괄 설치
       # --------------------------------------------------------
       - name: Install dependencies
         run: pip install -r requirements_dev.txt
 
       # --------------------------------------------------------
-      # Step 4: flake8 — 코드 스타일 검사 (PEP 8)
+      # Step 4: flake8 — 코드 스타일 검사
       # continue-on-error: 실패해도 다음 단계 진행 (결과 수집 목적)
       # --------------------------------------------------------
       - name: Run flake8
@@ -77,7 +76,6 @@ jobs:
 
       # --------------------------------------------------------
       # Step 5: black — 코드 포맷 검사
-      # continue-on-error: 실패해도 다음 단계 진행 (결과 수집 목적)
       # --------------------------------------------------------
       - name: Run black
         id: black
@@ -86,7 +84,6 @@ jobs:
 
       # --------------------------------------------------------
       # Step 6: pytest — API 엔드포인트 단위 테스트
-      # continue-on-error: 실패해도 다음 단계 진행 (결과 수집 목적)
       # --------------------------------------------------------
       - name: Run pytest
         id: pytest
@@ -94,31 +91,45 @@ jobs:
         run: pytest tests/ -v
 
       # --------------------------------------------------------
-      # Step 7: 전체 결과 판정
-      # 하나라도 실패하면 exit 1 → job을 실패 상태로 전환
-      # continue-on-error 때문에 job이 자동 실패 처리되지 않으므로
-      # 명시적으로 실패 상태를 만들어야 GitHub에서 실패로 표시됨
+      # Step 7: 전체 결과 판정 + Slack 메시지 변수 사전 계산
+      # JSON payload 안에서 삼항 표현식 사용 시 파싱 오류 발생
+      # → 환경변수로 먼저 계산 후 payload에서 참조하는 방식 사용
       # --------------------------------------------------------
       - name: Check overall result
         id: result
         if: always()
         run: |
+          FLAKE8_RESULT="${{ steps.flake8.outcome == 'success' && 'PASS' || 'FAIL' }}"
+          BLACK_RESULT="${{ steps.black.outcome == 'success' && 'PASS' || 'FAIL' }}"
+          PYTEST_RESULT="${{ steps.pytest.outcome == 'success' && 'PASS' || 'FAIL' }}"
+
           if [[ "${{ steps.flake8.outcome }}" == "failure" || \
                 "${{ steps.black.outcome }}" == "failure"  || \
                 "${{ steps.pytest.outcome }}" == "failure" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
-            exit 1
+            echo "color=#dc3545" >> $GITHUB_OUTPUT
+            echo "title=[FAIL] CI 실패 — aci-ops-webui" >> $GITHUB_OUTPUT
           else
             echo "status=success" >> $GITHUB_OUTPUT
+            echo "color=#198754" >> $GITHUB_OUTPUT
+            echo "title=[PASS] CI 통과 — aci-ops-webui" >> $GITHUB_OUTPUT
+          fi
+
+          echo "flake8_result=${FLAKE8_RESULT}" >> $GITHUB_OUTPUT
+          echo "black_result=${BLACK_RESULT}" >> $GITHUB_OUTPUT
+          echo "pytest_result=${PYTEST_RESULT}" >> $GITHUB_OUTPUT
+
+          # job 실패 상태 처리
+          if [[ "${{ steps.flake8.outcome }}" == "failure" || \
+                "${{ steps.black.outcome }}" == "failure"  || \
+                "${{ steps.pytest.outcome }}" == "failure" ]]; then
+            exit 1
           fi
 
       # --------------------------------------------------------
       # Step 8: Slack 알림
       # if: always() — 성공/실패 무관하게 항상 실행
-      # Block Kit 구조:
-      #   - header : 성공/실패 제목 (색상 구분)
-      #   - section: 브랜치, 작성자, 커밋 메시지, 단계별 결과
-      #   - actions: Actions 로그 바로가기 버튼
+      # payload에서 환경변수(steps.result.outputs.*)를 참조
       # --------------------------------------------------------
       - name: Notify Slack
         if: always()
@@ -128,13 +139,13 @@ jobs:
             {
               "attachments": [
                 {
-                  "color": "${{ steps.result.outcome == 'failure' && '#dc3545' || '#198754' }}",
+                  "color": "${{ steps.result.outputs.color }}",
                   "blocks": [
                     {
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "${{ steps.result.outcome == 'failure' && '[FAIL] CI 실패 — aci-ops-webui' || '[PASS] CI 통과 — aci-ops-webui' }}"
+                        "text": "${{ steps.result.outputs.title }}"
                       }
                     },
                     {
@@ -154,7 +165,7 @@ jobs:
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "*단계별 결과*\nflake8: ${{ steps.flake8.outcome == 'success' && 'PASS' || 'FAIL' }}  |  black: ${{ steps.black.outcome == 'success' && 'PASS' || 'FAIL' }}  |  pytest: ${{ steps.pytest.outcome == 'success' && 'PASS' || 'FAIL' }}"
+                          "text": "*단계별 결과*\nflake8: ${{ steps.result.outputs.flake8_result }}  |  black: ${{ steps.result.outputs.black_result }}  |  pytest: ${{ steps.result.outputs.pytest_result }}"
                         }
                       ]
                     },
