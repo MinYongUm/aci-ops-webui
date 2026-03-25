@@ -1,5 +1,10 @@
 # 설정 파일 (비밀번호 포함)
 config.yaml
+config.yaml.local
+config.yaml.sandbox
+
+# 환경변수 파일 (Docker 접속 정보 포함)
+.env
 
 # Python 캐시
 __pycache__/
