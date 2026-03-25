@@ -40,7 +40,7 @@ MOCK_HEALTH: dict[str, Any] = {
         {
             "severity": "major",
             "description": "Interface Eth1/1 is down",
-            "dn": "topology/pod-1/node-101/local/svc-policyelem-id-0/uni/epp/fv-[uni/tn-TenantA]/node-101/stpathatt-[eth1/1]/conndef/conn-[0.0.0.0]-[0.0.0.0]",
+            "dn": "topology/pod-1/node-101/uni/epp/fv-[uni/tn-TenantA]/node-101/stpathatt-[eth1/1]",
         }
     ],
 }
