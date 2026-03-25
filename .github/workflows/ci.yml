@@ -22,6 +22,7 @@
 # [Slack 알림]
 #   - 시점: 성공/실패 모두 (if: always())
 #   - 내용: 단계별 결과, 커밋 메시지 + 작성자, 브랜치, Actions 링크
+#   - 방식: jq로 JSON 생성 → curl로 직접 전송 (특수문자 안전 처리)
 #   - Secret: SLACK_WEBHOOK_URL (레포 Settings → Secrets 등록 완료)
 # ============================================================
 
@@ -91,101 +92,91 @@ jobs:
         run: pytest tests/ -v
 
       # --------------------------------------------------------
-      # Step 7: 전체 결과 판정 + Slack 메시지 변수 사전 계산
-      # JSON payload 안에서 삼항 표현식 사용 시 파싱 오류 발생
-      # → 환경변수로 먼저 계산 후 payload에서 참조하는 방식 사용
+      # Step 7: Slack 알림 + 전체 결과 판정
+      # jq로 JSON 생성 → 특수문자(따옴표, 줄바꿈 등) 안전 처리
+      # curl로 Webhook URL에 직접 전송
       # --------------------------------------------------------
-      - name: Check overall result
-        id: result
+      - name: Notify Slack
         if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          FLAKE8_OUTCOME: ${{ steps.flake8.outcome }}
+          BLACK_OUTCOME: ${{ steps.black.outcome }}
+          PYTEST_OUTCOME: ${{ steps.pytest.outcome }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          COMMIT_MSG: ${{ github.event.head_commit.message || github.event.pull_request.title }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          FLAKE8_RESULT="${{ steps.flake8.outcome == 'success' && 'PASS' || 'FAIL' }}"
-          BLACK_RESULT="${{ steps.black.outcome == 'success' && 'PASS' || 'FAIL' }}"
-          PYTEST_RESULT="${{ steps.pytest.outcome == 'success' && 'PASS' || 'FAIL' }}"
+          # 단계별 결과 계산
+          FLAKE8_RESULT=$([ "$FLAKE8_OUTCOME" = "success" ] && echo "PASS" || echo "FAIL")
+          BLACK_RESULT=$([ "$BLACK_OUTCOME" = "success" ] && echo "PASS" || echo "FAIL")
+          PYTEST_RESULT=$([ "$PYTEST_OUTCOME" = "success" ] && echo "PASS" || echo "FAIL")
 
-          if [[ "${{ steps.flake8.outcome }}" == "failure" || \
-                "${{ steps.black.outcome }}" == "failure"  || \
-                "${{ steps.pytest.outcome }}" == "failure" ]]; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-            echo "color=#dc3545" >> $GITHUB_OUTPUT
-            echo "title=[FAIL] CI 실패 — aci-ops-webui" >> $GITHUB_OUTPUT
+          # 전체 결과 판정
+          if [[ "$FLAKE8_OUTCOME" == "failure" || "$BLACK_OUTCOME" == "failure" || "$PYTEST_OUTCOME" == "failure" ]]; then
+            COLOR="#dc3545"
+            TITLE="[FAIL] CI 실패 — aci-ops-webui"
           else
-            echo "status=success" >> $GITHUB_OUTPUT
-            echo "color=#198754" >> $GITHUB_OUTPUT
-            echo "title=[PASS] CI 통과 — aci-ops-webui" >> $GITHUB_OUTPUT
+            COLOR="#198754"
+            TITLE="[PASS] CI 통과 — aci-ops-webui"
           fi
 
-          echo "flake8_result=${FLAKE8_RESULT}" >> $GITHUB_OUTPUT
-          echo "black_result=${BLACK_RESULT}" >> $GITHUB_OUTPUT
-          echo "pytest_result=${PYTEST_RESULT}" >> $GITHUB_OUTPUT
+          STEP_RESULTS="flake8: ${FLAKE8_RESULT}  |  black: ${BLACK_RESULT}  |  pytest: ${PYTEST_RESULT}"
 
-          # job 실패 상태 처리
+          # jq로 JSON 생성 (특수문자 자동 이스케이프)
+          PAYLOAD=$(jq -n \
+            --arg color "$COLOR" \
+            --arg title "$TITLE" \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg commit_msg "$COMMIT_MSG" \
+            --arg step_results "$STEP_RESULTS" \
+            --arg run_url "$RUN_URL" \
+            '{
+              attachments: [{
+                color: $color,
+                blocks: [
+                  {
+                    type: "header",
+                    text: { type: "plain_text", text: $title }
+                  },
+                  {
+                    type: "section",
+                    fields: [
+                      { type: "mrkdwn", text: ("*브랜치*\n`" + $branch + "`") },
+                      { type: "mrkdwn", text: ("*작성자*\n" + $actor) },
+                      { type: "mrkdwn", text: ("*커밋 메시지*\n" + $commit_msg) },
+                      { type: "mrkdwn", text: ("*단계별 결과*\n" + $step_results) }
+                    ]
+                  },
+                  {
+                    type: "actions",
+                    elements: [{
+                      type: "button",
+                      text: { type: "plain_text", text: "Actions 로그 보기" },
+                      url: $run_url
+                    }]
+                  }
+                ]
+              }]
+            }')
+
+          # curl로 Webhook 전송
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
+
+      # --------------------------------------------------------
+      # Step 8: 전체 결과 판정 (job 실패 상태 처리)
+      # Notify Slack 이후에 실행하여 알림 후 job 상태 결정
+      # --------------------------------------------------------
+      - name: Check overall result
+        if: always()
+        run: |
           if [[ "${{ steps.flake8.outcome }}" == "failure" || \
                 "${{ steps.black.outcome }}" == "failure"  || \
                 "${{ steps.pytest.outcome }}" == "failure" ]]; then
             exit 1
           fi
-
-      # --------------------------------------------------------
-      # Step 8: Slack 알림
-      # if: always() — 성공/실패 무관하게 항상 실행
-      # payload에서 환경변수(steps.result.outputs.*)를 참조
-      # --------------------------------------------------------
-      - name: Notify Slack
-        if: always()
-        uses: slackapi/slack-github-action@v1.27.0
-        with:
-          payload: |
-            {
-              "attachments": [
-                {
-                  "color": "${{ steps.result.outputs.color }}",
-                  "blocks": [
-                    {
-                      "type": "header",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "${{ steps.result.outputs.title }}"
-                      }
-                    },
-                    {
-                      "type": "section",
-                      "fields": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "*브랜치*\n`${{ github.ref_name }}`"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*작성자*\n${{ github.actor }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*커밋 메시지*\n${{ github.event.head_commit.message || github.event.pull_request.title }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*단계별 결과*\nflake8: ${{ steps.result.outputs.flake8_result }}  |  black: ${{ steps.result.outputs.black_result }}  |  pytest: ${{ steps.result.outputs.pytest_result }}"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Actions 로그 보기"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
