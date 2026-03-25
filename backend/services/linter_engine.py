@@ -138,18 +138,14 @@ class DataCollector:
         for class_name in target_classes:
             try:
                 imdata = aci_client.get(class_name)
-                raw[class_name] = DataCollector._extract_attributes(
-                    class_name, imdata
-                )
+                raw[class_name] = DataCollector._extract_attributes(class_name, imdata)
                 logger.debug(
                     "Collected %d objects for class %s",
                     len(raw[class_name]),
                     class_name,
                 )
             except Exception as exc:
-                logger.warning(
-                    "Failed to collect class %s: %s", class_name, exc
-                )
+                logger.warning("Failed to collect class %s: %s", class_name, exc)
                 raw[class_name] = []
 
         collected = CollectedData()
@@ -199,9 +195,7 @@ class DataCollector:
         return collected
 
     @staticmethod
-    def _extract_attributes(
-        class_name: str, imdata: list
-    ) -> list[dict[str, Any]]:
+    def _extract_attributes(class_name: str, imdata: list) -> list[dict[str, Any]]:
         """imdata 배열에서 attributes 딕셔너리만 추출"""
         result = []
         for item in imdata:
@@ -279,9 +273,7 @@ class RuleEngine:
     # Security Rules
     # ------------------------------------------
 
-    def check_sec_001_risky_contract(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_sec_001_risky_contract(self, data: CollectedData) -> list[LintIssue]:
         """
         SEC-001: permitAll 계열 위험 키워드를 포함한 Contract 탐지
 
@@ -313,9 +305,7 @@ class RuleEngine:
 
         return issues
 
-    def check_sec_002_empty_contract(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_sec_002_empty_contract(self, data: CollectedData) -> list[LintIssue]:
         """
         SEC-002: Subject가 없는 빈 Contract 탐지
 
@@ -327,9 +317,7 @@ class RuleEngine:
         """
         issues: list[LintIssue] = []
 
-        subject_dns: set[str] = {
-            attrs.get("dn", "") for attrs in data.get("vzSubj")
-        }
+        subject_dns: set[str] = {attrs.get("dn", "") for attrs in data.get("vzSubj")}
 
         for attrs in data.get("vzBrCP"):
             contract_dn: str = attrs.get("dn", "")
@@ -357,9 +345,7 @@ class RuleEngine:
 
         return issues
 
-    def check_sec_003_empty_subject(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_sec_003_empty_subject(self, data: CollectedData) -> list[LintIssue]:
         """
         SEC-003: Filter가 연결되지 않은 빈 Subject 탐지
 
@@ -403,9 +389,7 @@ class RuleEngine:
     # Best Practice Rules
     # ------------------------------------------
 
-    def check_bp_001_epg_no_bd(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_bp_001_epg_no_bd(self, data: CollectedData) -> list[LintIssue]:
         """
         BP-001: BD가 연결되지 않은 EPG 탐지
 
@@ -417,17 +401,13 @@ class RuleEngine:
         """
         issues: list[LintIssue] = []
 
-        bd_rel_dns: set[str] = {
-            attrs.get("dn", "") for attrs in data.get("fvRsBd")
-        }
+        bd_rel_dns: set[str] = {attrs.get("dn", "") for attrs in data.get("fvRsBd")}
 
         for attrs in data.get("fvAEPg"):
             epg_dn: str = attrs.get("dn", "")
             name: str = attrs.get("name", "")
 
-            has_bd = any(
-                rel_dn.startswith(epg_dn + "/") for rel_dn in bd_rel_dns
-            )
+            has_bd = any(rel_dn.startswith(epg_dn + "/") for rel_dn in bd_rel_dns)
 
             if not has_bd:
                 issues.append(
@@ -445,9 +425,7 @@ class RuleEngine:
 
         return issues
 
-    def check_bp_002_epg_no_contract(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_bp_002_epg_no_contract(self, data: CollectedData) -> list[LintIssue]:
         """
         BP-002: Contract(Provided/Consumed)이 없는 고립 EPG 탐지
 
@@ -458,23 +436,15 @@ class RuleEngine:
         """
         issues: list[LintIssue] = []
 
-        prov_dns: set[str] = {
-            attrs.get("dn", "") for attrs in data.get("fvRsProv")
-        }
-        cons_dns: set[str] = {
-            attrs.get("dn", "") for attrs in data.get("fvRsCons")
-        }
+        prov_dns: set[str] = {attrs.get("dn", "") for attrs in data.get("fvRsProv")}
+        cons_dns: set[str] = {attrs.get("dn", "") for attrs in data.get("fvRsCons")}
 
         for attrs in data.get("fvAEPg"):
             epg_dn: str = attrs.get("dn", "")
             name: str = attrs.get("name", "")
 
-            has_prov = any(
-                dn.startswith(epg_dn + "/") for dn in prov_dns
-            )
-            has_cons = any(
-                dn.startswith(epg_dn + "/") for dn in cons_dns
-            )
+            has_prov = any(dn.startswith(epg_dn + "/") for dn in prov_dns)
+            has_cons = any(dn.startswith(epg_dn + "/") for dn in cons_dns)
 
             if not has_prov and not has_cons:
                 issues.append(
@@ -492,9 +462,7 @@ class RuleEngine:
 
         return issues
 
-    def check_bp_003_bd_no_subnet(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_bp_003_bd_no_subnet(self, data: CollectedData) -> list[LintIssue]:
         """
         BP-003: Subnet이 없는 BD 탐지
 
@@ -506,17 +474,13 @@ class RuleEngine:
         """
         issues: list[LintIssue] = []
 
-        subnet_dns: set[str] = {
-            attrs.get("dn", "") for attrs in data.get("fvSubnet")
-        }
+        subnet_dns: set[str] = {attrs.get("dn", "") for attrs in data.get("fvSubnet")}
 
         for attrs in data.get("fvBD"):
             bd_dn: str = attrs.get("dn", "")
             name: str = attrs.get("name", "")
 
-            has_subnet = any(
-                sn_dn.startswith(bd_dn + "/") for sn_dn in subnet_dns
-            )
+            has_subnet = any(sn_dn.startswith(bd_dn + "/") for sn_dn in subnet_dns)
 
             if not has_subnet:
                 issues.append(
@@ -538,9 +502,7 @@ class RuleEngine:
     # Naming Convention Rules
     # ------------------------------------------
 
-    def check_nm_001_invalid_characters(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_nm_001_invalid_characters(self, data: CollectedData) -> list[LintIssue]:
         """
         NM-001: 이름에 공백 또는 허용되지 않는 특수문자 포함 탐지
 
@@ -571,9 +533,7 @@ class RuleEngine:
 
         return issues
 
-    def check_nm_002_prefix_convention(
-        self, data: CollectedData
-    ) -> list[LintIssue]:
+    def check_nm_002_prefix_convention(self, data: CollectedData) -> list[LintIssue]:
         """
         NM-002: config.yaml에 정의된 prefix 규칙 위반 탐지
 
@@ -657,9 +617,7 @@ class LinterService:
             logger.info("Naming config loaded: %s", naming)
             return naming
         except FileNotFoundError:
-            logger.warning(
-                "config.yaml not found — naming rules will use defaults"
-            )
+            logger.warning("config.yaml not found — naming rules will use defaults")
             return {}
         except Exception as exc:
             logger.error("Failed to load naming config: %s", exc)

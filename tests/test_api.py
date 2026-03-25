@@ -119,6 +119,7 @@ MOCK_ENDPOINT_SEARCH: list[dict[str, Any]] = [
 # 픽스처: Mock ACIClient + TestClient
 # ============================================
 
+
 @pytest.fixture()
 def client() -> TestClient:
     """
@@ -150,6 +151,7 @@ def client() -> TestClient:
 # 테스트: 루트 엔드포인트
 # ============================================
 
+
 class TestRoot:
     @pytest.mark.skip(
         reason="GET /는 FileResponse(HTML)를 반환하므로 API 테스트 범위 제외"
@@ -163,6 +165,7 @@ class TestRoot:
 # ============================================
 # 테스트: Health Check API
 # ============================================
+
 
 class TestHealthAPI:
     def test_health_returns_200(self, client: TestClient) -> None:
@@ -185,6 +188,7 @@ class TestHealthAPI:
 # 테스트: Policy Check API
 # ============================================
 
+
 class TestPolicyAPI:
     def test_policy_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/policy")
@@ -199,6 +203,7 @@ class TestPolicyAPI:
 # ============================================
 # 테스트: Interface Monitor API
 # ============================================
+
 
 class TestInterfaceAPI:
     def test_interface_returns_200(self, client: TestClient) -> None:
@@ -216,6 +221,7 @@ class TestInterfaceAPI:
 # ============================================
 # 테스트: Endpoint Tracker API
 # ============================================
+
 
 class TestEndpointAPI:
     def test_endpoint_returns_200(self, client: TestClient) -> None:
@@ -249,6 +255,7 @@ class TestEndpointAPI:
 # 테스트: Audit Log API
 # ============================================
 
+
 class TestAuditAPI:
     def test_audit_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/audit")
@@ -263,6 +270,7 @@ class TestAuditAPI:
 # ============================================
 # 테스트: Capacity Report API
 # ============================================
+
 
 class TestCapacityAPI:
     def test_capacity_returns_200(self, client: TestClient) -> None:
@@ -279,6 +287,7 @@ class TestCapacityAPI:
 # 테스트: Topology Viewer API
 # ============================================
 
+
 class TestTopologyAPI:
     def test_topology_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/topology")
@@ -294,6 +303,7 @@ class TestTopologyAPI:
 # ============================================
 # 테스트: All-in-One API
 # ============================================
+
 
 class TestAllAPI:
     def test_all_returns_200(self, client: TestClient) -> None:
@@ -314,11 +324,12 @@ class TestAllAPI:
             "topology",
         }
         assert expected_keys.issubset(data.keys())
-        
-        
+
+
 # ============================================
 # TestLinterAPI — GET /api/lint
 # ============================================
+
 
 class TestLinterAPI:
     def test_lint_returns_200(self, client):
@@ -352,6 +363,7 @@ class TestLinterAPI:
 # TestLinterUploadAPI — POST /api/lint/upload
 # ============================================
 
+
 class TestLinterUploadAPI:
     """
     파일 업로드 기반 Linter 테스트.
@@ -361,6 +373,7 @@ class TestLinterUploadAPI:
     def _upload(self, client, payload: dict):
         """JSON payload를 파일로 업로드하는 헬퍼"""
         import json
+
         content = json.dumps(payload).encode("utf-8")
         return client.post(
             "/api/lint/upload",
@@ -413,23 +426,35 @@ class TestLinterUploadAPI:
     # ------------------------------------------
 
     def test_sec_001_detects_risky_contract(self, client):
-        payload = {"imdata": [
-            {"vzBrCP": {"attributes": {
-                "name": "permitAll",
-                "dn": "uni/tn-T1/brc-permitAll"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "vzBrCP": {
+                        "attributes": {
+                            "name": "permitAll",
+                            "dn": "uni/tn-T1/brc-permitAll",
+                        }
+                    }
+                }
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "SEC-001" in rule_ids
 
     def test_sec_001_clean_contract_no_issue(self, client):
-        payload = {"imdata": [
-            {"vzBrCP": {"attributes": {
-                "name": "CON-WebToDB",
-                "dn": "uni/tn-T1/brc-CON-WebToDB"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "vzBrCP": {
+                        "attributes": {
+                            "name": "CON-WebToDB",
+                            "dn": "uni/tn-T1/brc-CON-WebToDB",
+                        }
+                    }
+                }
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "SEC-001" not in rule_ids
@@ -439,28 +464,41 @@ class TestLinterUploadAPI:
     # ------------------------------------------
 
     def test_sec_002_detects_empty_contract(self, client):
-        payload = {"imdata": [
-            {"vzBrCP": {"attributes": {
-                "name": "CON-Empty",
-                "dn": "uni/tn-T1/brc-CON-Empty"
-            }}}
-            # vzSubj 없음 → SEC-002 발생
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "vzBrCP": {
+                        "attributes": {
+                            "name": "CON-Empty",
+                            "dn": "uni/tn-T1/brc-CON-Empty",
+                        }
+                    }
+                }
+                # vzSubj 없음 → SEC-002 발생
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "SEC-002" in rule_ids
 
     def test_sec_002_contract_with_subject_no_issue(self, client):
-        payload = {"imdata": [
-            {"vzBrCP": {"attributes": {
-                "name": "CON-Web",
-                "dn": "uni/tn-T1/brc-CON-Web"
-            }}},
-            {"vzSubj": {"attributes": {
-                "name": "Subj1",
-                "dn": "uni/tn-T1/brc-CON-Web/subj-Subj1"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "vzBrCP": {
+                        "attributes": {"name": "CON-Web", "dn": "uni/tn-T1/brc-CON-Web"}
+                    }
+                },
+                {
+                    "vzSubj": {
+                        "attributes": {
+                            "name": "Subj1",
+                            "dn": "uni/tn-T1/brc-CON-Web/subj-Subj1",
+                        }
+                    }
+                },
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "SEC-002" not in rule_ids
@@ -470,28 +508,44 @@ class TestLinterUploadAPI:
     # ------------------------------------------
 
     def test_bp_001_detects_epg_without_bd(self, client):
-        payload = {"imdata": [
-            {"fvAEPg": {"attributes": {
-                "name": "EPG-Web",
-                "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web"
-            }}}
-            # fvRsBd 없음 → BP-001 발생
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "fvAEPg": {
+                        "attributes": {
+                            "name": "EPG-Web",
+                            "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web",
+                        }
+                    }
+                }
+                # fvRsBd 없음 → BP-001 발생
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "BP-001" in rule_ids
 
     def test_bp_001_epg_with_bd_no_issue(self, client):
-        payload = {"imdata": [
-            {"fvAEPg": {"attributes": {
-                "name": "EPG-Web",
-                "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web"
-            }}},
-            {"fvRsBd": {"attributes": {
-                "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web/rsbd",
-                "tnFvBDName": "BD-Web"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "fvAEPg": {
+                        "attributes": {
+                            "name": "EPG-Web",
+                            "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web",
+                        }
+                    }
+                },
+                {
+                    "fvRsBd": {
+                        "attributes": {
+                            "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web/rsbd",
+                            "tnFvBDName": "BD-Web",
+                        }
+                    }
+                },
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "BP-001" not in rule_ids
@@ -501,23 +555,32 @@ class TestLinterUploadAPI:
     # ------------------------------------------
 
     def test_nm_001_detects_invalid_characters(self, client):
-        payload = {"imdata": [
-            {"fvTenant": {"attributes": {
-                "name": "My Tenant!",
-                "dn": "uni/tn-My Tenant!"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "fvTenant": {
+                        "attributes": {"name": "My Tenant!", "dn": "uni/tn-My Tenant!"}
+                    }
+                }
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "NM-001" in rule_ids
 
     def test_nm_001_valid_name_no_issue(self, client):
-        payload = {"imdata": [
-            {"fvTenant": {"attributes": {
-                "name": "TN-Production",
-                "dn": "uni/tn-TN-Production"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "fvTenant": {
+                        "attributes": {
+                            "name": "TN-Production",
+                            "dn": "uni/tn-TN-Production",
+                        }
+                    }
+                }
+            ]
+        }
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "NM-001" not in rule_ids
@@ -527,23 +590,35 @@ class TestLinterUploadAPI:
     # ------------------------------------------
 
     def test_result_severity_values_are_valid(self, client):
-        payload = {"imdata": [
-            {"vzBrCP": {"attributes": {
-                "name": "permitAll",
-                "dn": "uni/tn-T1/brc-permitAll"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "vzBrCP": {
+                        "attributes": {
+                            "name": "permitAll",
+                            "dn": "uni/tn-T1/brc-permitAll",
+                        }
+                    }
+                }
+            ]
+        }
         data = self._upload(client, payload).json()
         for result in data["results"]:
             assert result["severity"] in ("critical", "warning")
 
     def test_result_category_values_are_valid(self, client):
-        payload = {"imdata": [
-            {"vzBrCP": {"attributes": {
-                "name": "permitAll",
-                "dn": "uni/tn-T1/brc-permitAll"
-            }}}
-        ]}
+        payload = {
+            "imdata": [
+                {
+                    "vzBrCP": {
+                        "attributes": {
+                            "name": "permitAll",
+                            "dn": "uni/tn-T1/brc-permitAll",
+                        }
+                    }
+                }
+            ]
+        }
         data = self._upload(client, payload).json()
         for result in data["results"]:
             assert result["category"] in ("Security", "BestPractice", "Naming")
