@@ -34,10 +34,7 @@ from routers.topology import get_topology_data
 # ============================================
 # FastAPI 앱 인스턴스 생성
 # ============================================
-app = FastAPI(
-    title="ACI Ops WebUI",
-    version="1.1.0"
-)
+app = FastAPI(title="ACI Ops WebUI", version="1.1.0")
 
 # ============================================
 # ACI 클라이언트 초기화
@@ -53,6 +50,7 @@ app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 # ============================================
 # API 엔드포인트 정의
 # ============================================
+
 
 @app.get("/")
 async def root():
@@ -88,10 +86,10 @@ async def api_endpoint():
 async def api_endpoint_search(q: str = Query(..., description="MAC or IP address")):
     """
     Endpoint 검색 API (v1.1.0 추가)
-    
+
     - MAC 주소 또는 IP 주소로 검색
     - 위치 정보 (Node, Interface) 포함
-    
+
     Args:
         q: 검색어 (MAC 또는 IP)
     Returns:
@@ -122,7 +120,7 @@ async def api_topology():
 async def api_all():
     """
     전체 리포트 API
-    
+
     - 모든 모듈 데이터를 한 번에 조회
     - 대시보드 초기 로딩 시 사용
     """
@@ -133,5 +131,5 @@ async def api_all():
         "endpoint": get_endpoint_data(aci),
         "audit": get_audit_data(aci),
         "capacity": get_capacity_data(aci),
-        "topology": get_topology_data(aci)
+        "topology": get_topology_data(aci),
     }

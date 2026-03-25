@@ -119,6 +119,7 @@ MOCK_ENDPOINT_SEARCH: list[dict[str, Any]] = [
 # 픽스처: Mock ACIClient + TestClient
 # ============================================
 
+
 @pytest.fixture()
 def client() -> TestClient:
     """
@@ -149,8 +150,11 @@ def client() -> TestClient:
 # 테스트: 루트 엔드포인트
 # ============================================
 
+
 class TestRoot:
-    @pytest.mark.skip(reason="GET /는 FileResponse(HTML)를 반환하므로 API 테스트 범위 제외")
+    @pytest.mark.skip(
+        reason="GET /는 FileResponse(HTML)를 반환하므로 API 테스트 범위 제외"
+    )
     def test_root_returns_200(self, client: TestClient) -> None:
         """GET / 가 200을 반환해야 한다."""
         response = client.get("/")
@@ -160,6 +164,7 @@ class TestRoot:
 # ============================================
 # 테스트: Health Check API
 # ============================================
+
 
 class TestHealthAPI:
     def test_health_returns_200(self, client: TestClient) -> None:
@@ -182,6 +187,7 @@ class TestHealthAPI:
 # 테스트: Policy Check API
 # ============================================
 
+
 class TestPolicyAPI:
     def test_policy_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/policy")
@@ -196,6 +202,7 @@ class TestPolicyAPI:
 # ============================================
 # 테스트: Interface Monitor API
 # ============================================
+
 
 class TestInterfaceAPI:
     def test_interface_returns_200(self, client: TestClient) -> None:
@@ -213,6 +220,7 @@ class TestInterfaceAPI:
 # ============================================
 # 테스트: Endpoint Tracker API
 # ============================================
+
 
 class TestEndpointAPI:
     def test_endpoint_returns_200(self, client: TestClient) -> None:
@@ -246,6 +254,7 @@ class TestEndpointAPI:
 # 테스트: Audit Log API
 # ============================================
 
+
 class TestAuditAPI:
     def test_audit_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/audit")
@@ -260,6 +269,7 @@ class TestAuditAPI:
 # ============================================
 # 테스트: Capacity Report API
 # ============================================
+
 
 class TestCapacityAPI:
     def test_capacity_returns_200(self, client: TestClient) -> None:
@@ -276,6 +286,7 @@ class TestCapacityAPI:
 # 테스트: Topology Viewer API
 # ============================================
 
+
 class TestTopologyAPI:
     def test_topology_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/topology")
@@ -291,6 +302,7 @@ class TestTopologyAPI:
 # ============================================
 # 테스트: All-in-One API
 # ============================================
+
 
 class TestAllAPI:
     def test_all_returns_200(self, client: TestClient) -> None:
