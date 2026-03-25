@@ -11,12 +11,18 @@
 #   1. flake8  — PEP 8 스타일 검사
 #   2. black   — 코드 포맷 검사 (--check 모드, 파일 수정 없음)
 #   3. pytest  — API 엔드포인트 단위 테스트
+#   4. Slack   — 성공/실패 알림 (항상 실행)
 #
 # [구조 주의사항]
 #   - 진입점은 backend/main.py (루트 플랫 구조 아님)
 #   - flake8/black 스코프: backend/ tests/ 만 적용
 #   - pytest 실행 위치: 레포 루트 (tests/ 경로 기준)
 #   - config.yaml 없음 → tests/conftest.py 패치로 처리됨
+#
+# [Slack 알림]
+#   - 시점: 성공/실패 모두 (if: always())
+#   - 내용: 단계별 결과, 커밋 메시지 + 작성자, 브랜치, Actions 링크
+#   - Secret: SLACK_WEBHOOK_URL (레포 Settings → Secrets 등록 완료)
 # ============================================================
 
 name: CI
@@ -55,31 +61,120 @@ jobs:
 
       # --------------------------------------------------------
       # Step 3: 의존성 설치
-      # requirements-dev.txt → requirements.txt 포함하여 일괄 설치
+      # requirements_dev.txt → requirements.txt 포함하여 일괄 설치
       # --------------------------------------------------------
       - name: Install dependencies
         run: pip install -r requirements_dev.txt
 
       # --------------------------------------------------------
       # Step 4: flake8 — 코드 스타일 검사 (PEP 8)
-      # 스코프: backend/, tests/ (frontend/ 제외 — Python 파일 없음)
+      # continue-on-error: 실패해도 다음 단계 진행 (결과 수집 목적)
       # --------------------------------------------------------
       - name: Run flake8
+        id: flake8
+        continue-on-error: true
         run: flake8 backend/ tests/
 
       # --------------------------------------------------------
       # Step 5: black — 코드 포맷 검사
-      # --check: 실제 파일 수정 없이 포맷 불일치 여부만 확인
-      # --diff:  포맷 불일치 발생 시 변경 내용을 로그에 출력
-      # 스코프: backend/, tests/
+      # continue-on-error: 실패해도 다음 단계 진행 (결과 수집 목적)
       # --------------------------------------------------------
       - name: Run black
+        id: black
+        continue-on-error: true
         run: black --check --diff backend/ tests/
 
       # --------------------------------------------------------
       # Step 6: pytest — API 엔드포인트 단위 테스트
-      # 실행 위치: 레포 루트 (tests/ 디렉토리 기준)
-      # -v: 테스트 케이스별 결과 상세 출력
+      # continue-on-error: 실패해도 다음 단계 진행 (결과 수집 목적)
       # --------------------------------------------------------
       - name: Run pytest
+        id: pytest
+        continue-on-error: true
         run: pytest tests/ -v
+
+      # --------------------------------------------------------
+      # Step 7: 전체 결과 판정
+      # 하나라도 실패하면 exit 1 → job을 실패 상태로 전환
+      # continue-on-error 때문에 job이 자동 실패 처리되지 않으므로
+      # 명시적으로 실패 상태를 만들어야 GitHub에서 실패로 표시됨
+      # --------------------------------------------------------
+      - name: Check overall result
+        id: result
+        if: always()
+        run: |
+          if [[ "${{ steps.flake8.outcome }}" == "failure" || \
+                "${{ steps.black.outcome }}" == "failure"  || \
+                "${{ steps.pytest.outcome }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+
+      # --------------------------------------------------------
+      # Step 8: Slack 알림
+      # if: always() — 성공/실패 무관하게 항상 실행
+      # Block Kit 구조:
+      #   - header : 성공/실패 제목 (색상 구분)
+      #   - section: 브랜치, 작성자, 커밋 메시지, 단계별 결과
+      #   - actions: Actions 로그 바로가기 버튼
+      # --------------------------------------------------------
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ steps.result.outcome == 'failure' && '#dc3545' || '#198754' }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "${{ steps.result.outcome == 'failure' && '[FAIL] CI 실패 — aci-ops-webui' || '[PASS] CI 통과 — aci-ops-webui' }}"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*브랜치*\n`${{ github.ref_name }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*작성자*\n${{ github.actor }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*커밋 메시지*\n${{ github.event.head_commit.message || github.event.pull_request.title }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*단계별 결과*\nflake8: ${{ steps.flake8.outcome == 'success' && 'PASS' || 'FAIL' }}  |  black: ${{ steps.black.outcome == 'success' && 'PASS' || 'FAIL' }}  |  pytest: ${{ steps.pytest.outcome == 'success' && 'PASS' || 'FAIL' }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "Actions 로그 보기"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
