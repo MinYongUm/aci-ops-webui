@@ -116,6 +116,7 @@ async def api_topology():
     """Topology Viewer API"""
     return get_topology_data(aci)
 
+
 @app.get("/api/lint")
 async def api_lint():
     """Config Linter API — APIC Live 조회"""
@@ -126,6 +127,7 @@ async def api_lint():
 async def api_lint_upload(file: UploadFile = File(...)):
     """Config Linter API — JSON 파일 업로드"""
     return await lint_upload(file)
+
 
 @app.get("/api/all")
 async def api_all():

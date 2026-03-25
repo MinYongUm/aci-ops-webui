@@ -11,7 +11,7 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile
 
 from services.linter_engine import LinterService
 
