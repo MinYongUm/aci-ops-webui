@@ -24,3 +24,5 @@ uvicorn==0.34.0
 
 # 비동기 HTTP 클라이언트 — FastAPI TestClient 의존성 (pytest 테스트에 필요)
 httpx==0.28.1
+
+python-multipart==0.0.20
