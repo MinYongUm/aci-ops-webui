@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.1] - 2026-03-25
+### Added
+- GitHub Actions CI/CD 파이프라인 (.github/workflows/ci.yml)
+  - flake8, black, pytest 자동 실행
+  - 트리거: main 브랜치 push, 모든 pull_request
+- Dockerfile (python:3.12-slim 기반 컨테이너 이미지)
+- docker_compose.yml (로컬 개발 환경 오케스트레이션)
+- .env.example (Docker 환경변수 템플릿)
+- .flake8 (flake8 코드 스타일 설정, max-line-length 120)
+- requirements_dev.txt (개발/테스트 의존성 분리)
+
+### Changed
+- requirements.txt 버전 고정 (재현 가능한 빌드 환경)
+- .gitignore 업데이트 (.env, config.yaml.local, config.yaml.sandbox 추가)
+
+### Fixed
+- flake8 E402 (backend/main.py sys.path.append 구조)
+- flake8 E501 (tests/test_api.py mock DN 문자열 단축)
+- black 포맷 적용 (11개 파일)
+
 ## [1.2.0] - 2026-03-24
 ### Added
 - tests/test_api.py: pytest 기반 API 엔드포인트 단위 테스트 (ACIClient Mock 처리)
