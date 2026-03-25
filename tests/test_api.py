@@ -119,7 +119,6 @@ MOCK_ENDPOINT_SEARCH: list[dict[str, Any]] = [
 # 픽스처: Mock ACIClient + TestClient
 # ============================================
 
-
 @pytest.fixture()
 def client() -> TestClient:
     """
@@ -131,6 +130,7 @@ def client() -> TestClient:
     with patch("main.ACIClient") as mock_aci_class:
         mock_aci_instance = MagicMock()
         mock_aci_class.return_value = mock_aci_instance
+        mock_aci_instance.get.return_value = []  # Linter Live Scan용 빈 배열
 
         # 각 라우터 함수가 참조하는 데이터 반환값 설정
         with (
@@ -150,7 +150,6 @@ def client() -> TestClient:
 # 테스트: 루트 엔드포인트
 # ============================================
 
-
 class TestRoot:
     @pytest.mark.skip(
         reason="GET /는 FileResponse(HTML)를 반환하므로 API 테스트 범위 제외"
@@ -164,7 +163,6 @@ class TestRoot:
 # ============================================
 # 테스트: Health Check API
 # ============================================
-
 
 class TestHealthAPI:
     def test_health_returns_200(self, client: TestClient) -> None:
@@ -187,7 +185,6 @@ class TestHealthAPI:
 # 테스트: Policy Check API
 # ============================================
 
-
 class TestPolicyAPI:
     def test_policy_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/policy")
@@ -202,7 +199,6 @@ class TestPolicyAPI:
 # ============================================
 # 테스트: Interface Monitor API
 # ============================================
-
 
 class TestInterfaceAPI:
     def test_interface_returns_200(self, client: TestClient) -> None:
@@ -220,7 +216,6 @@ class TestInterfaceAPI:
 # ============================================
 # 테스트: Endpoint Tracker API
 # ============================================
-
 
 class TestEndpointAPI:
     def test_endpoint_returns_200(self, client: TestClient) -> None:
@@ -254,7 +249,6 @@ class TestEndpointAPI:
 # 테스트: Audit Log API
 # ============================================
 
-
 class TestAuditAPI:
     def test_audit_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/audit")
@@ -269,7 +263,6 @@ class TestAuditAPI:
 # ============================================
 # 테스트: Capacity Report API
 # ============================================
-
 
 class TestCapacityAPI:
     def test_capacity_returns_200(self, client: TestClient) -> None:
@@ -286,7 +279,6 @@ class TestCapacityAPI:
 # 테스트: Topology Viewer API
 # ============================================
 
-
 class TestTopologyAPI:
     def test_topology_returns_200(self, client: TestClient) -> None:
         response = client.get("/api/topology")
@@ -302,7 +294,6 @@ class TestTopologyAPI:
 # ============================================
 # 테스트: All-in-One API
 # ============================================
-
 
 class TestAllAPI:
     def test_all_returns_200(self, client: TestClient) -> None:
@@ -323,3 +314,234 @@ class TestAllAPI:
             "topology",
         }
         assert expected_keys.issubset(data.keys())
+# ============================================
+# TestLinterAPI — GET /api/lint
+# ============================================
+
+class TestLinterAPI:
+    def test_lint_returns_200(self, client):
+        response = client.get("/api/lint")
+        assert response.status_code == 200
+
+    def test_lint_response_keys(self, client):
+        data = client.get("/api/lint").json()
+        assert "source" in data
+        assert "total_issues" in data
+        assert "summary" in data
+        assert "results" in data
+
+    def test_lint_summary_keys(self, client):
+        summary = client.get("/api/lint").json()["summary"]
+        assert "critical" in summary
+        assert "warning" in summary
+
+    def test_lint_source_is_live(self, client):
+        data = client.get("/api/lint").json()
+        assert data["source"] == "live"
+
+    def test_lint_empty_aci_returns_zero_issues(self, client):
+        # ACIClient가 빈 배열을 반환하므로 이슈 0개 예상
+        data = client.get("/api/lint").json()
+        assert data["total_issues"] == 0
+        assert data["results"] == []
+
+
+# ============================================
+# TestLinterUploadAPI — POST /api/lint/upload
+# ============================================
+
+class TestLinterUploadAPI:
+    """
+    파일 업로드 기반 Linter 테스트.
+    실제 APIC 없이 규칙별 탐지 동작을 검증.
+    """
+
+    def _upload(self, client, payload: dict):
+        """JSON payload를 파일로 업로드하는 헬퍼"""
+        import json
+        content = json.dumps(payload).encode("utf-8")
+        return client.post(
+            "/api/lint/upload",
+            files={"file": ("test.json", content, "application/json")},
+        )
+
+    # ------------------------------------------
+    # 기본 응답 구조 검증
+    # ------------------------------------------
+
+    def test_upload_returns_200(self, client):
+        response = self._upload(client, {"imdata": []})
+        assert response.status_code == 200
+
+    def test_upload_response_keys(self, client):
+        data = self._upload(client, {"imdata": []}).json()
+        assert "source" in data
+        assert "total_issues" in data
+        assert "summary" in data
+        assert "results" in data
+
+    def test_upload_source_is_upload(self, client):
+        data = self._upload(client, {"imdata": []}).json()
+        assert data["source"] == "upload"
+
+    def test_upload_empty_imdata_returns_zero_issues(self, client):
+        data = self._upload(client, {"imdata": []}).json()
+        assert data["total_issues"] == 0
+
+    # ------------------------------------------
+    # 오류 처리 검증
+    # ------------------------------------------
+
+    def test_upload_non_json_file_returns_400(self, client):
+        response = client.post(
+            "/api/lint/upload",
+            files={"file": ("test.txt", b"not json", "text/plain")},
+        )
+        assert response.status_code == 400
+
+    def test_upload_invalid_json_returns_400(self, client):
+        response = client.post(
+            "/api/lint/upload",
+            files={"file": ("test.json", b"{invalid json}", "application/json")},
+        )
+        assert response.status_code == 400
+
+    # ------------------------------------------
+    # SEC-001: permitAll 계열 Contract 탐지
+    # ------------------------------------------
+
+    def test_sec_001_detects_risky_contract(self, client):
+        payload = {"imdata": [
+            {"vzBrCP": {"attributes": {
+                "name": "permitAll",
+                "dn": "uni/tn-T1/brc-permitAll"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "SEC-001" in rule_ids
+
+    def test_sec_001_clean_contract_no_issue(self, client):
+        payload = {"imdata": [
+            {"vzBrCP": {"attributes": {
+                "name": "CON-WebToDB",
+                "dn": "uni/tn-T1/brc-CON-WebToDB"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "SEC-001" not in rule_ids
+
+    # ------------------------------------------
+    # SEC-002: Subject 없는 빈 Contract 탐지
+    # ------------------------------------------
+
+    def test_sec_002_detects_empty_contract(self, client):
+        payload = {"imdata": [
+            {"vzBrCP": {"attributes": {
+                "name": "CON-Empty",
+                "dn": "uni/tn-T1/brc-CON-Empty"
+            }}}
+            # vzSubj 없음 → SEC-002 발생
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "SEC-002" in rule_ids
+
+    def test_sec_002_contract_with_subject_no_issue(self, client):
+        payload = {"imdata": [
+            {"vzBrCP": {"attributes": {
+                "name": "CON-Web",
+                "dn": "uni/tn-T1/brc-CON-Web"
+            }}},
+            {"vzSubj": {"attributes": {
+                "name": "Subj1",
+                "dn": "uni/tn-T1/brc-CON-Web/subj-Subj1"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "SEC-002" not in rule_ids
+
+    # ------------------------------------------
+    # BP-001: EPG에 BD 미연결 탐지
+    # ------------------------------------------
+
+    def test_bp_001_detects_epg_without_bd(self, client):
+        payload = {"imdata": [
+            {"fvAEPg": {"attributes": {
+                "name": "EPG-Web",
+                "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web"
+            }}}
+            # fvRsBd 없음 → BP-001 발생
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "BP-001" in rule_ids
+
+    def test_bp_001_epg_with_bd_no_issue(self, client):
+        payload = {"imdata": [
+            {"fvAEPg": {"attributes": {
+                "name": "EPG-Web",
+                "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web"
+            }}},
+            {"fvRsBd": {"attributes": {
+                "dn": "uni/tn-T1/ap-AP1/epg-EPG-Web/rsbd",
+                "tnFvBDName": "BD-Web"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "BP-001" not in rule_ids
+
+    # ------------------------------------------
+    # NM-001: 이름에 공백/특수문자 탐지
+    # ------------------------------------------
+
+    def test_nm_001_detects_invalid_characters(self, client):
+        payload = {"imdata": [
+            {"fvTenant": {"attributes": {
+                "name": "My Tenant!",
+                "dn": "uni/tn-My Tenant!"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "NM-001" in rule_ids
+
+    def test_nm_001_valid_name_no_issue(self, client):
+        payload = {"imdata": [
+            {"fvTenant": {"attributes": {
+                "name": "TN-Production",
+                "dn": "uni/tn-TN-Production"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        rule_ids = [r["rule_id"] for r in data["results"]]
+        assert "NM-001" not in rule_ids
+
+    # ------------------------------------------
+    # severity 및 category 값 검증
+    # ------------------------------------------
+
+    def test_result_severity_values_are_valid(self, client):
+        payload = {"imdata": [
+            {"vzBrCP": {"attributes": {
+                "name": "permitAll",
+                "dn": "uni/tn-T1/brc-permitAll"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        for result in data["results"]:
+            assert result["severity"] in ("critical", "warning")
+
+    def test_result_category_values_are_valid(self, client):
+        payload = {"imdata": [
+            {"vzBrCP": {"attributes": {
+                "name": "permitAll",
+                "dn": "uni/tn-T1/brc-permitAll"
+            }}}
+        ]}
+        data = self._upload(client, payload).json()
+        for result in data["results"]:
+            assert result["category"] in ("Security", "BestPractice", "Naming")

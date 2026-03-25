@@ -1,14 +1,14 @@
 # ============================================
 # ACI Ops WebUI - Backend Main
 # 목적: FastAPI 애플리케이션 진입점
-# 버전: v1.1.0 - Endpoint 검색 API 추가
+# 버전: v1.3.0 - Config Linter 추가
 #
 # 실행 방법:
 #   cd backend
 #   uvicorn main:app --reload --host 0.0.0.0 --port 8000
 # ============================================
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import sys
@@ -30,11 +30,12 @@ from routers.endpoint import get_endpoint_data, search_endpoint
 from routers.audit import get_audit_data
 from routers.capacity import get_capacity_data
 from routers.topology import get_topology_data
+from routers.linter import get_lint_data, lint_upload
 
 # ============================================
 # FastAPI 앱 인스턴스 생성
 # ============================================
-app = FastAPI(title="ACI Ops WebUI", version="1.1.0")
+app = FastAPI(title="ACI Ops WebUI", version="1.3.0")
 
 # ============================================
 # ACI 클라이언트 초기화
@@ -115,6 +116,16 @@ async def api_topology():
     """Topology Viewer API"""
     return get_topology_data(aci)
 
+@app.get("/api/lint")
+async def api_lint():
+    """Config Linter API — APIC Live 조회"""
+    return get_lint_data(aci)
+
+
+@app.post("/api/lint/upload")
+async def api_lint_upload(file: UploadFile = File(...)):
+    """Config Linter API — JSON 파일 업로드"""
+    return await lint_upload(file)
 
 @app.get("/api/all")
 async def api_all():

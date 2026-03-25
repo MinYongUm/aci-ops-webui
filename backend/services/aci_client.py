@@ -110,4 +110,4 @@ class ACIClient:
         resp = self.session.get(url, verify=False)
 
         # imdata 배열 반환 (없으면 빈 배열)
-        return resp.json().get("imdata", [])
+        return [item for item in resp.json().get("imdata", []) if class_name in item]

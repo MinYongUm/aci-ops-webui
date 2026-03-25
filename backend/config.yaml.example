@@ -1,0 +1,30 @@
+# config.yaml
+# 실제 사용 시 이 파일을 config.yaml로 복사 후 수정하세요
+# 이 파일은 레포에 포함됩니다 — 실제 접속 정보를 입력하지 마세요
+
+# ============================================
+# APIC 접속 정보
+# ============================================
+apic:
+  host: "https://APIC_IP_OR_HOSTNAME"
+  username: "계정명"
+  password: "비밀번호"
+
+# ============================================
+# Config Linter 설정 (v1.3.0)
+# ============================================
+linter:
+  naming:
+    # enabled: true로 설정 시 NM-001, NM-002 규칙 활성화
+    # false로 설정 시 Naming 규칙 전체 스킵
+    enabled: true
+
+    # 아래 prefix 항목은 선택 사항입니다
+    # 값을 비워두거나 항목을 삭제하면 해당 클래스의 prefix 검사를 스킵합니다
+    # 예시: tenant_prefix: "TN-"  →  TN-으로 시작하지 않는 Tenant 이름을 위반으로 탐지
+
+    tenant_prefix: ""       # 예: "TN-"
+    bd_prefix: ""           # 예: "BD-"
+    epg_prefix: ""          # 예: "EPG-"
+    contract_prefix: ""     # 예: "CON-"
+    ap_prefix: ""           # 예: "AP-"
