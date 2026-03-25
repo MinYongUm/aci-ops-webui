@@ -14,6 +14,9 @@
 #   extend-ignore = W293, W292
 #     - W293: 빈 줄에 공백 포함 (에디터 설정 문제, 동작에 영향 없음)
 #     - W292: 파일 끝 개행 없음 (에디터 설정 문제, 동작에 영향 없음)
+#   per-file-ignores
+#     - backend/main.py E402: sys.path.append()가 import 앞에 위치
+#       → backend/ 서브디렉토리 구조에서 경로 설정을 위해 의도적으로 필요
 # ============================================================
 
 [flake8]
@@ -28,6 +31,12 @@ max-line-length = 120
 # W293: 빈 줄에 공백 포함
 # W292: 파일 끝 개행 없음
 extend-ignore = W293, W292
+
+# 파일별 개별 무시 설정
+# backend/main.py — E402: sys.path.append()가 import 앞에 위치
+#   → backend/ 서브디렉토리 구조에서 경로 설정을 위해 의도적으로 필요
+per-file-ignores =
+    backend/main.py: E402
 
 # 검사 제외 대상
 # __pycache__: Python 바이트코드 캐시 폴더
