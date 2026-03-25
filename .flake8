@@ -1,0 +1,39 @@
+# ============================================================
+# .flake8
+# 목적: flake8 코드 스타일 검사 설정
+# 적용 범위: backend/, tests/
+#
+# 실행 방법:
+#   flake8 backend/ tests/         (로컬 터미널)
+#   flake8 backend/ tests/ --show-source  (위반 코드 함께 출력)
+#
+# [설정 근거]
+#   max-line-length = 120
+#     - PEP 8 기본값(79자)은 현대 모니터 환경에서 지나치게 엄격
+#     - 120자가 실무 Python 프로젝트의 현실적인 기준
+#   extend-ignore = W293, W292
+#     - W293: 빈 줄에 공백 포함 (에디터 설정 문제, 동작에 영향 없음)
+#     - W292: 파일 끝 개행 없음 (에디터 설정 문제, 동작에 영향 없음)
+# ============================================================
+
+[flake8]
+
+# 검사 대상 디렉토리
+filename = backend/*.py, tests/*.py
+
+# 최대 라인 길이 (PEP 8 기본 79자 → 120자로 완화)
+max-line-length = 120
+
+# 무시할 에러 코드
+# W293: 빈 줄에 공백 포함
+# W292: 파일 끝 개행 없음
+extend-ignore = W293, W292
+
+# 검사 제외 대상
+# __pycache__: Python 바이트코드 캐시 폴더
+# frontend/  : HTML/JS 파일 (Python 아님)
+# legacy/    : 이전 버전 보관 폴더
+exclude =
+    __pycache__,
+    frontend/,
+    legacy/
