@@ -1,18 +1,21 @@
 # ============================================
 # ACI Ops WebUI - Backend Main
 # 목적: FastAPI 애플리케이션 진입점
-# 버전: v1.4.0 - Microsegmentation Simulator 추가
+# 버전: v1.5.0 - APIC Failover, /api/all 병렬 처리
 #
 # 실행 방법:
 #   cd backend
-#   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+#   uvicorn main:app --reload --host 127.0.0.1 --port 8000
 # ============================================
 
-from fastapi import FastAPI, Query, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import sys
+import logging
 import os
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from fastapi import FastAPI, Query, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 # ============================================
 # 경로 설정
@@ -22,21 +25,26 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # ============================================
 # 모듈 import
 # ============================================
-from services.aci_client import ACIClient
-from routers.health import get_health_data
-from routers.policy import get_policy_data
-from routers.interface import get_interface_data
-from routers.endpoint import get_endpoint_data, search_endpoint
 from routers.audit import get_audit_data
 from routers.capacity import get_capacity_data
-from routers.topology import get_topology_data
+from routers.endpoint import get_endpoint_data, search_endpoint
+from routers.health import get_health_data
+from routers.interface import get_interface_data
 from routers.linter import get_lint_data, lint_upload
+from routers.policy import get_policy_data
 from routers.simulator import get_simulate_router
+from routers.topology import get_topology_data
+from services.aci_client import ACIClient
+
+logger = logging.getLogger(__name__)
 
 # ============================================
 # FastAPI 앱 인스턴스 생성
 # ============================================
-app = FastAPI(title="ACI Ops WebUI", version="1.4.0")
+app = FastAPI(
+    title="ACI Ops WebUI",
+    version="1.5.0",
+)
 
 # ============================================
 # ACI 클라이언트 초기화
@@ -49,7 +57,7 @@ aci = ACIClient()
 app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 
 # ============================================
-# 라우터 등록
+# 라우터 등록 (팩토리 패턴 — aci 인스턴스 주입 필요한 것만)
 # ============================================
 app.include_router(get_simulate_router(aci))
 
@@ -92,7 +100,7 @@ async def api_endpoint():
 @app.get("/api/endpoint/search")
 async def api_endpoint_search(q: str = Query(..., description="MAC or IP address")):
     """
-    Endpoint 검색 API (v1.1.0 추가)
+    Endpoint 검색 API
 
     - MAC 주소 또는 IP 주소로 검색
     - 위치 정보 (Node, Interface) 포함
@@ -130,7 +138,7 @@ async def api_lint():
 
 
 @app.post("/api/lint/upload")
-async def api_lint_upload(file: UploadFile = File(...)):
+async def api_lint_upload(file: UploadFile):
     """Config Linter API — JSON 파일 업로드"""
     return await lint_upload(file)
 
@@ -138,17 +146,43 @@ async def api_lint_upload(file: UploadFile = File(...)):
 @app.get("/api/all")
 async def api_all():
     """
-    전체 리포트 API
+    전체 리포트 API (v1.5.0 — 병렬 처리)
 
-    - 모든 모듈 데이터를 한 번에 조회
+    - 7개 모듈을 ThreadPoolExecutor로 동시 조회
+    - 가장 느린 모듈 1개의 응답 시간이 전체 응답 시간
+    - 모듈 단위 예외 발생 시 해당 모듈만 None 반환 (전체 실패 방지)
     - 대시보드 초기 로딩 시 사용
     """
-    return {
-        "health": get_health_data(aci),
-        "policy": get_policy_data(aci),
-        "interface": get_interface_data(aci),
-        "endpoint": get_endpoint_data(aci),
-        "audit": get_audit_data(aci),
-        "capacity": get_capacity_data(aci),
-        "topology": get_topology_data(aci),
+    # ============================================
+    # 실행할 모듈 목록 (키 이름, 함수) 쌍으로 정의
+    # ============================================
+    tasks = {
+        "health": get_health_data,
+        "policy": get_policy_data,
+        "interface": get_interface_data,
+        "endpoint": get_endpoint_data,
+        "audit": get_audit_data,
+        "capacity": get_capacity_data,
+        "topology": get_topology_data,
     }
+
+    results: dict = {}
+
+    # ============================================
+    # ThreadPoolExecutor — 모듈 수만큼 동시 실행
+    # max_workers=len(tasks): 모듈 추가/제거 시 자동 반영
+    # ============================================
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        # Future 객체와 모듈 키 매핑
+        future_to_key = {executor.submit(fn, aci): key for key, fn in tasks.items()}
+
+        for future in as_completed(future_to_key):
+            key = future_to_key[future]
+            try:
+                results[key] = future.result()
+            except Exception as exc:
+                # 모듈 단위 예외 — 해당 모듈만 None, 나머지는 정상 반환
+                logger.error("/api/all 모듈 실행 오류 [%s]: %s", key, exc)
+                results[key] = None
+
+    return results

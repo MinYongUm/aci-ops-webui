@@ -31,6 +31,31 @@ pip install -r requirements.txt
 pip install -r requirements_dev.txt
 ```
 
+## 설정
+
+```
+cd backend
+copy config.yaml.example config.yaml
+# config.yaml 편집: hosts, username, password 입력
+```
+
+### config.yaml 구조 (v1.5.0)
+
+```yaml
+apic:
+  hosts:
+    - "https://APIC1_IP_OR_HOSTNAME"   # Primary
+    - "https://APIC2_IP_OR_HOSTNAME"   # Failover (클러스터 구성 시)
+    - "https://APIC3_IP_OR_HOSTNAME"   # Failover (클러스터 구성 시)
+  username: "계정명"
+  password: "비밀번호"
+  timeout: 30   # API 요청 타임아웃 (초)
+  retry: 3      # Failover 재시도 횟수
+```
+
+APIC 단독(1대) 구성은 `hosts`에 1개만 입력합니다.
+Primary 연결 실패 시 다음 host로 자동 전환됩니다.
+
 ## 실행
 ```
 cd backend
@@ -68,7 +93,7 @@ docker compose up
 | GET /api/simulate/tenants | Tenant 목록 조회 (드롭다운용) |
 | GET /api/simulate/epgs?tenant= | EPG 목록 조회 (드롭다운용) |
 | POST /api/simulate | 트래픽 허용/차단 판정 |
-| GET /api/all | 전체 데이터 |
+| GET /api/all | 전체 데이터 병렬 조회 (v1.5.0) |
 
 ## Config Linter
 
@@ -118,7 +143,7 @@ aci-ops-webui/
 │   ├── config.yaml              # APIC 설정 (gitignore)
 │   ├── config.yaml.example      # APIC 설정 템플릿
 │   ├── services/
-│   │   ├── aci_client.py        # ACI API 클라이언트
+│   │   ├── aci_client.py        # ACI API 클라이언트 (Failover 지원)
 │   │   ├── linter_engine.py     # Config Linter 규칙 엔진
 │   │   └── simulator_engine.py  # Microsegmentation Simulator 엔진
 │   └── routers/
@@ -135,8 +160,16 @@ aci-ops-webui/
 │   └── index.html               # 대시보드 UI (시멘틱 HTML)
 └── tests/
     ├── conftest.py              # pytest 패치 설정
-    └── test_api.py              # API 단위 테스트 (58 passed, 1 skipped)
+    └── test_api.py              # API 단위 테스트 (61 passed, 1 skipped)
 ```
+
+## 테스트
+
+```
+pytest tests/ -v
+```
+
+v1.5.0 기준: 61 passed, 1 skipped
 
 ## 환경
 

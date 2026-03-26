@@ -1,6 +1,6 @@
 # ============================================
 # ACI Ops WebUI - pytest 공통 픽스처
-# 버전: v1.2.0
+# 버전: v1.5.0
 # 목적: main.py import 시 발생하는 두 가지 모듈 레벨 실행을
 #       실제 파일/디렉토리 없이 통과시키기 위한 사전 패치
 #
@@ -15,6 +15,14 @@ from unittest.mock import MagicMock, patch
 
 # backend/ 경로를 sys.path에 추가 (conftest에서 한 번만 처리)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+
+# ============================================
+# 패치 전에 원본 ACIClient 클래스 저장 (v1.5.0)
+# TestACIClientFailover에서 실제 인스턴스 생성 시 사용
+# ============================================
+import services.aci_client as _aci_module
+
+_RealACIClient = _aci_module.ACIClient
 
 # ACIClient 패치 — config.yaml 읽기 방지
 _patcher_aci = patch("services.aci_client.ACIClient")

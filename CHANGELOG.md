@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.5.0] - 2026-03-26
+### Added
+- APIC Failover: config.yaml `hosts` 리스트 구조 도입
+  - Primary APIC 연결 실패 시 다음 host로 자동 전환
+  - 단독(1대) / 클러스터(3대) 혼재 환경 모두 지원
+- ACIClient 에러핸들링 강화
+  - `timeout` / `retry` 횟수 config.yaml에서 설정 가능
+  - Timeout / ConnectionError 발생 시 Failover 재시도
+  - 세션 만료(401) 감지 후 자동 재로그인 및 1회 재시도
+  - 전체 host 실패 시 빈 배열 반환 (예외 미전파)
+- `/api/all` 병렬 처리: ThreadPoolExecutor 도입
+  - 7개 모듈 동시 조회 → 응답 시간 단축
+  - `max_workers=len(tasks)`: 모듈 추가/제거 시 자동 반영
+  - 모듈 단위 예외 발생 시 해당 모듈만 None 반환 (전체 실패 방지)
+- TestACIClientFailover 테스트 클래스 추가 (3개)
+  - test_failover_on_first_host_down
+  - test_all_hosts_down_returns_empty
+  - test_session_expired_relogin
+
+### Changed
+- config.yaml.example: `host` (단수) → `hosts` (리스트) 구조 변경, timeout/retry 항목 추가
+- aci_client.py: `_get_once()` 내부 메서드 분리, 타입 힌트 전면 적용
+- main.py: 버전 v1.5.0 반영, linter 엔드포인트 직접 정의 방식으로 통일
+- conftest.py: `_RealACIClient` 저장 추가 (Failover 테스트 지원)
+- .flake8: tests/conftest.py E402 예외 추가
+
+### Test
+- 61 passed, 1 skipped (v1.4.0 대비 +3)
+
 ## [1.4.0] - 2026-03-26
 ### Added
 - Microsegmentation Simulator 기능 추가

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 from unittest.mock import MagicMock, patch
+import requests
 
 import pytest
 from fastapi.testclient import TestClient
@@ -842,3 +843,135 @@ class TestSimulatorAPI:
             json={"src_epg_dn": SRC_EPG_DN},
         )
         assert response.status_code == 422
+
+
+class TestACIClientFailover:
+    """
+    ACIClient Failover / 에러핸들링 단위 테스트 (v1.5.0)
+
+    - conftest.py가 ACIClient를 모듈 레벨에서 patch하므로,
+      패치 전에 저장한 _RealACIClient로 실제 인스턴스를 생성
+    - _load_config patch: config.yaml 파일 없이 config dict 직접 주입
+    - Session.post patch: login() Failover 시나리오 제어
+    - Session.get patch:  get() 세션 만료(401) 시나리오 제어
+    """
+
+    # 테스트용 config — hosts 3개 (Primary + Failover 2개)
+    MOCK_CONFIG = {
+        "apic": {
+            "hosts": [
+                "https://apic1.test",
+                "https://apic2.test",
+                "https://apic3.test",
+            ],
+            "username": "admin",
+            "password": "test1234",
+            "timeout": 5,
+            "retry": 3,
+        },
+        "linter": {"naming": {"enabled": True}},
+    }
+
+    def _make_client(self):
+        """
+        실제 ACIClient 인스턴스 생성 헬퍼
+
+        conftest.py가 ACIClient를 모듈 레벨에서 patch하므로,
+        패치 전에 저장한 _RealACIClient를 사용해 실제 인스턴스를 생성한다.
+        _load_config를 patch해서 MOCK_CONFIG를 직접 주입한다.
+        """
+        import conftest as cf
+
+        with patch.object(
+            cf._RealACIClient,
+            "_load_config",
+            return_value=self.MOCK_CONFIG,
+        ):
+            return cf._RealACIClient("dummy.yaml")
+
+    def test_failover_on_first_host_down(self):
+        """
+        Primary APIC 연결 실패 시 Secondary로 자동 전환 검증
+
+        시나리오:
+          hosts[0] (apic1) → ConnectionError (Down)
+          hosts[1] (apic2) → HTTP 200 (Up)
+          기대: self.apic == "https://apic2.test"
+        """
+        client = self._make_client()
+
+        ok_response = MagicMock()
+        ok_response.ok = True
+
+        with patch.object(
+            client.session,
+            "post",
+            side_effect=[
+                requests.exceptions.ConnectionError("apic1 down"),
+                ok_response,
+            ],
+        ):
+            result = client.login()
+
+        assert result is True
+        assert client.apic == "https://apic2.test"
+        assert client.logged_in is True
+
+    def test_all_hosts_down_returns_empty(self):
+        """
+        모든 APIC host 연결 실패 시 get() 빈 배열 반환 검증
+
+        시나리오:
+          hosts[0,1,2] 전부 → ConnectionError
+          기대: login() == False, get() == []
+        """
+        client = self._make_client()
+
+        with patch.object(
+            client.session,
+            "post",
+            side_effect=requests.exceptions.ConnectionError("all down"),
+        ):
+            with patch.object(client.session, "get") as mock_get:
+                result = client.get("faultInst")
+
+        assert result == []
+        assert client.logged_in is False
+        mock_get.assert_not_called()
+
+    def test_session_expired_relogin(self):
+        """
+        APIC 세션 만료(401) 시 자동 재로그인 후 재시도 검증
+
+        시나리오:
+          get() 1회차 → HTTP 401 (세션 만료)
+          login() 재시도 → 성공
+          get() 2회차 → HTTP 200, imdata 정상 반환
+          기대: 결과 == 정상 데이터
+        """
+        client = self._make_client()
+        client.logged_in = True
+
+        expired_response = MagicMock()
+        expired_response.status_code = 401
+        expired_response.json.return_value = {"imdata": []}
+
+        relogin_response = MagicMock()
+        relogin_response.ok = True
+
+        ok_response = MagicMock()
+        ok_response.status_code = 200
+        ok_response.json.return_value = {
+            "imdata": [{"faultInst": {"attributes": {"severity": "critical"}}}]
+        }
+
+        with patch.object(client.session, "post", return_value=relogin_response):
+            with patch.object(
+                client.session,
+                "get",
+                side_effect=[expired_response, ok_response],
+            ):
+                result = client.get("faultInst")
+
+        assert len(result) == 1
+        assert "faultInst" in result[0]
