@@ -24,9 +24,11 @@ logger = logging.getLogger(__name__)
 # 데이터 클래스 정의
 # ============================================
 
+
 @dataclass
 class EpgInfo:
     """EPG 기본 정보"""
+
     dn: str
     name: str
     tenant: str
@@ -36,6 +38,7 @@ class EpgInfo:
 @dataclass
 class FilterEntry:
     """Contract Filter 상세 항목"""
+
     name: str
     ether_type: str = "unspecified"
     ip_protocol: str = "unspecified"
@@ -46,6 +49,7 @@ class FilterEntry:
 @dataclass
 class SubjectInfo:
     """Contract Subject 정보"""
+
     name: str
     filters: list[FilterEntry] = field(default_factory=list)
 
@@ -53,6 +57,7 @@ class SubjectInfo:
 @dataclass
 class ContractInfo:
     """Contract 전체 정보"""
+
     name: str
     tenant: str
     dn: str
@@ -62,7 +67,8 @@ class ContractInfo:
 @dataclass
 class SimulationResult:
     """시뮬레이션 결과"""
-    verdict: str                                      # "ALLOW" or "DENY"
+
+    verdict: str  # "ALLOW" or "DENY"
     src_epg: str
     dst_epg: str
     src_tenant: str
@@ -74,6 +80,7 @@ class SimulationResult:
 # ============================================
 # 헬퍼 함수
 # ============================================
+
 
 def _extract_tenant(dn: str) -> str:
     """DN에서 Tenant 이름 추출. 예: uni/tn-TenantA/... → TenantA"""
@@ -107,6 +114,7 @@ def _make_contract_key(tenant: str, name: str) -> str:
 # ============================================
 # 데이터 수집 클래스
 # ============================================
+
 
 class SimulatorDataCollector:
     """
@@ -144,10 +152,7 @@ class SimulatorDataCollector:
             name = attr.get("name", "")
             # 시스템 Tenant 제외
             if name not in ("common", "infra", "mgmt"):
-                result.append({
-                    "name": name,
-                    "dn": attr.get("dn", "")
-                })
+                result.append({"name": name, "dn": attr.get("dn", "")})
 
         return sorted(result, key=lambda x: x["name"])
 
@@ -179,12 +184,14 @@ class SimulatorDataCollector:
             ap_match = re.search(r"ap-([^/]+)", dn)
             epg_match = re.search(r"epg-([^/]+)", dn)
 
-            result.append(EpgInfo(
-                dn=dn,
-                name=epg_match.group(1) if epg_match else attr.get("name", ""),
-                tenant=epg_tenant,
-                app_profile=ap_match.group(1) if ap_match else "unknown"
-            ))
+            result.append(
+                EpgInfo(
+                    dn=dn,
+                    name=epg_match.group(1) if epg_match else attr.get("name", ""),
+                    tenant=epg_tenant,
+                    app_profile=ap_match.group(1) if ap_match else "unknown",
+                )
+            )
 
         return sorted(result, key=lambda x: (x.tenant, x.app_profile, x.name))
 
@@ -231,7 +238,7 @@ class SimulatorDataCollector:
             logger.exception("fvRsCons 조회 실패")
 
         # Contract → Subject 매핑
-        subj_map: dict[str, list[str]] = {}   # contract_dn → [subject_dn, ...]
+        subj_map: dict[str, list[str]] = {}  # contract_dn → [subject_dn, ...]
         try:
             for item in self._aci.get("vzSubj"):
                 attr = item["vzSubj"]["attributes"]
@@ -268,36 +275,35 @@ class SimulatorDataCollector:
                 for subj_dn in subj_map.get(dn, []):
                     subj_name = _extract_subject_name(subj_dn)
                     filter_names = filter_map.get(subj_dn, [])
-                    subjects.append(SubjectInfo(
-                        name=subj_name,
-                        filters=[FilterEntry(name=f) for f in filter_names]
-                    ))
+                    subjects.append(
+                        SubjectInfo(
+                            name=subj_name,
+                            filters=[FilterEntry(name=f) for f in filter_names],
+                        )
+                    )
 
                 contracts[key] = ContractInfo(
-                    name=name,
-                    tenant=tenant,
-                    dn=dn,
-                    subjects=subjects
+                    name=name, tenant=tenant, dn=dn, subjects=subjects
                 )
         except Exception:
             logger.exception("vzBrCP 조회 실패")
 
         logger.info(
-            "데이터 수집 완료 — EPG: %d, Contract: %d",
-            len(epgs), len(contracts)
+            "데이터 수집 완료 — EPG: %d, Contract: %d", len(epgs), len(contracts)
         )
 
         return {
             "epgs": epgs,
             "providers": providers,
             "consumers": consumers,
-            "contracts": contracts
+            "contracts": contracts,
         }
 
 
 # ============================================
 # 시뮬레이션 엔진
 # ============================================
+
 
 class SimulatorEngine:
     """
@@ -330,7 +336,7 @@ class SimulatorEngine:
                 "name": e.name,
                 "tenant": e.tenant,
                 "app_profile": e.app_profile,
-                "display": f"{e.app_profile} / {e.name}"
+                "display": f"{e.app_profile} / {e.name}",
             }
             for e in epgs
         ]
@@ -386,7 +392,7 @@ class SimulatorEngine:
                     f"'{src_info.name}'(Consumer) and "
                     f"'{dst_info.name}'(Provider). "
                     f"ACI default policy: Deny-All."
-                )
+                ),
             )
 
         # 매칭된 Contract 중 Subject + Filter 유효성 확인
@@ -398,10 +404,7 @@ class SimulatorEngine:
             if not contract:
                 continue
 
-            has_filter = any(
-                len(subj.filters) > 0
-                for subj in contract.subjects
-            )
+            has_filter = any(len(subj.filters) > 0 for subj in contract.subjects)
 
             if contract.subjects and has_filter:
                 valid_contracts.append(contract)
@@ -410,9 +413,7 @@ class SimulatorEngine:
 
         # 유효 Contract 있음 → ALLOW
         if valid_contracts:
-            contract_names = ", ".join(
-                f"'{c.name}'" for c in valid_contracts
-            )
+            contract_names = ", ".join(f"'{c.name}'" for c in valid_contracts)
             return SimulationResult(
                 verdict="ALLOW",
                 src_epg=src_info.name,
@@ -423,13 +424,11 @@ class SimulatorEngine:
                 reason=(
                     f"Contract {contract_names} permits traffic: "
                     f"'{src_info.name}'(Consumer) → '{dst_info.name}'(Provider)."
-                )
+                ),
             )
 
         # Contract은 있으나 Subject/Filter 없음 → DENY
-        contract_names = ", ".join(
-            f"'{c.name}'" for c in empty_contracts
-        )
+        contract_names = ", ".join(f"'{c.name}'" for c in empty_contracts)
         return SimulationResult(
             verdict="DENY",
             src_epg=src_info.name,
@@ -440,13 +439,14 @@ class SimulatorEngine:
             reason=(
                 f"Contract {contract_names} exists but has no Subject or Filter. "
                 f"Traffic is denied."
-            )
+            ),
         )
 
 
 # ============================================
 # 헬퍼 — DN으로부터 EpgInfo 생성 (조회 실패 시 폴백)
 # ============================================
+
 
 def _epg_info_from_dn(dn: str) -> EpgInfo:
     """DN 파싱만으로 EpgInfo 구성 (APIC 조회 결과 없을 때 폴백)"""
@@ -457,5 +457,5 @@ def _epg_info_from_dn(dn: str) -> EpgInfo:
         dn=dn,
         name=epg_match.group(1) if epg_match else dn,
         tenant=tenant,
-        app_profile=ap_match.group(1) if ap_match else "unknown"
+        app_profile=ap_match.group(1) if ap_match else "unknown",
     )

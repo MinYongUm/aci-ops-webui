@@ -34,7 +34,6 @@ from services.simulator_engine import (  # noqa: E402
     SubjectInfo,
 )
 
-
 # ============================================
 # Mock 데이터 픽스처
 # ============================================
@@ -750,8 +749,15 @@ class TestSimulatorAPI:
     def test_simulate_response_keys(self, client: TestClient) -> None:
         """응답에 필수 키가 모두 포함되어야 한다."""
         data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
-        required = {"verdict", "src_epg", "dst_epg", "src_tenant", "dst_tenant",
-                    "matched_contracts", "reason"}
+        required = {
+            "verdict",
+            "src_epg",
+            "dst_epg",
+            "src_tenant",
+            "dst_tenant",
+            "matched_contracts",
+            "reason",
+        }
         assert required.issubset(data.keys())
 
     def test_simulate_verdict_is_valid_value(self, client: TestClient) -> None:
