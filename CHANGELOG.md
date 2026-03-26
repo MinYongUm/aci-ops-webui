@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.4.0] - 2026-03-26
+### Added
+- Microsegmentation Simulator 기능 추가
+  - GET /api/simulate/tenants: Tenant 목록 조회 (드롭다운용, 시스템 Tenant 제외)
+  - GET /api/simulate/epgs?tenant=: Tenant별 EPG 목록 조회
+  - POST /api/simulate: EPG 간 트래픽 허용/차단 판정 (ACI Whitelist 모델 기준)
+- backend/services/simulator_engine.py: 시뮬레이션 엔진 (SimulatorDataCollector, SimulatorEngine)
+  - EpgInfo, ContractInfo, SubjectInfo, FilterEntry, SimulationResult 데이터 클래스
+  - Consumer/Provider Contract 교집합 탐색 → ALLOW / DENY 판정
+- backend/routers/simulator.py: 시뮬레이터 API 엔드포인트 (팩토리 패턴 get_simulate_router)
+- frontend/index.html: Microsegmentation Simulator 섹션 UI 추가
+  - Source / Destination EPG 2단계 드롭다운 (Tenant → EPG)
+  - ALLOW / DENY 판정 배지 + 판정 근거 텍스트
+  - SVG 경로 다이어그램 (ALLOW: Contract 박스 연결선, DENY: 점선 + X 마크)
+  - Matched Contract / Subject / Filter 상세 테이블
+  - 다크모드 대응
+- tests/test_api.py: 시뮬레이터 테스트 18개 추가
+  - TestSimulatorTenantsAPI (2개), TestSimulatorEpgsAPI (3개), TestSimulatorAPI (13개)
+  - 전체 테스트: 58 passed, 1 skipped
+
+### Changed
+- backend/main.py: 버전 v1.4.0으로 업데이트, 시뮬레이터 라우터 등록
+
 ## [1.3.0] - 2026-03-25
 ### Added
 - Config Linter / Validator 기능 추가

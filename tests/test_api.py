@@ -1,6 +1,6 @@
 # ============================================
 # ACI Ops WebUI - API Test Suite
-# 버전: v1.2.0
+# 버전: v1.4.0
 # 목적: FastAPI 엔드포인트 단위 테스트 (APIC 미연결 환경)
 #
 # 실행 방법:
@@ -27,6 +27,12 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from main import app  # noqa: E402
+from services.simulator_engine import (  # noqa: E402
+    ContractInfo,
+    FilterEntry,
+    SimulationResult,
+    SubjectInfo,
+)
 
 
 # ============================================
@@ -114,6 +120,53 @@ MOCK_ENDPOINT_SEARCH: list[dict[str, Any]] = [
     }
 ]
 
+# ------------------------------------------
+# Simulator Mock 데이터
+# ------------------------------------------
+
+MOCK_SIMULATE_ALLOW = SimulationResult(
+    verdict="ALLOW",
+    src_epg="Web",
+    dst_epg="DB",
+    src_tenant="TenantA",
+    dst_tenant="TenantA",
+    matched_contracts=[
+        ContractInfo(
+            name="web-to-db",
+            tenant="TenantA",
+            dn="uni/tn-TenantA/brc-web-to-db",
+            subjects=[
+                SubjectInfo(
+                    name="http",
+                    filters=[
+                        FilterEntry(
+                            name="tcp-3306",
+                            ether_type="ip",
+                            ip_protocol="tcp",
+                            dst_from_port="3306",
+                            dst_to_port="3306",
+                        )
+                    ],
+                )
+            ],
+        )
+    ],
+    reason="Contract 'web-to-db' permits traffic: 'Web'(Consumer) -> 'DB'(Provider).",
+)
+
+MOCK_SIMULATE_DENY = SimulationResult(
+    verdict="DENY",
+    src_epg="Web",
+    dst_epg="Infra",
+    src_tenant="TenantA",
+    dst_tenant="TenantA",
+    matched_contracts=[],
+    reason="No Contract found between 'Web'(Consumer) and 'Infra'(Provider). ACI default policy: Deny-All.",
+)
+
+SRC_EPG_DN = "uni/tn-TenantA/ap-App/epg-Web"
+DST_EPG_DN = "uni/tn-TenantA/ap-App/epg-DB"
+
 
 # ============================================
 # 픽스처: Mock ACIClient + TestClient
@@ -131,7 +184,7 @@ def client() -> TestClient:
     with patch("main.ACIClient") as mock_aci_class:
         mock_aci_instance = MagicMock()
         mock_aci_class.return_value = mock_aci_instance
-        mock_aci_instance.get.return_value = []  # Linter Live Scan용 빈 배열
+        mock_aci_instance.get.return_value = []  # Linter/Simulator Live Scan용 빈 배열
 
         # 각 라우터 함수가 참조하는 데이터 반환값 설정
         with (
@@ -622,3 +675,164 @@ class TestLinterUploadAPI:
         data = self._upload(client, payload).json()
         for result in data["results"]:
             assert result["category"] in ("Security", "BestPractice", "Naming")
+
+
+# ============================================
+# TestSimulatorTenantsAPI — GET /api/simulate/tenants
+# ============================================
+
+
+class TestSimulatorTenantsAPI:
+    def test_tenants_returns_200(self, client: TestClient) -> None:
+        """Tenant 목록 조회 시 200을 반환해야 한다."""
+        response = client.get("/api/simulate/tenants")
+        assert response.status_code == 200
+
+    def test_tenants_returns_list(self, client: TestClient) -> None:
+        """응답이 리스트 형태여야 한다. ACIClient가 빈 배열을 반환하므로 빈 리스트."""
+        response = client.get("/api/simulate/tenants")
+        assert isinstance(response.json(), list)
+
+
+# ============================================
+# TestSimulatorEpgsAPI — GET /api/simulate/epgs
+# ============================================
+
+
+class TestSimulatorEpgsAPI:
+    def test_epgs_returns_200(self, client: TestClient) -> None:
+        """EPG 목록 조회 시 200을 반환해야 한다."""
+        response = client.get("/api/simulate/epgs")
+        assert response.status_code == 200
+
+    def test_epgs_returns_list(self, client: TestClient) -> None:
+        """응답이 리스트 형태여야 한다."""
+        response = client.get("/api/simulate/epgs")
+        assert isinstance(response.json(), list)
+
+    def test_epgs_with_tenant_filter_returns_200(self, client: TestClient) -> None:
+        """tenant 파라미터 지정 시에도 200을 반환해야 한다."""
+        response = client.get("/api/simulate/epgs?tenant=TenantA")
+        assert response.status_code == 200
+
+
+# ============================================
+# TestSimulatorAPI — POST /api/simulate
+# ============================================
+
+
+class TestSimulatorAPI:
+    """
+    시뮬레이션 판정 테스트.
+
+    DENY 케이스: ACIClient.get()이 빈 배열을 반환하므로
+                 Contract 없음 → ACI Whitelist 모델 기준 Deny-All 적용.
+    ALLOW 케이스: SimulatorEngine.simulate()를 직접 패치하여
+                  실제 APIC 데이터 없이 ALLOW 시나리오 검증.
+    """
+
+    def _simulate(self, client: TestClient, src: str, dst: str):
+        """시뮬레이션 요청 헬퍼"""
+        return client.post(
+            "/api/simulate",
+            json={"src_epg_dn": src, "dst_epg_dn": dst},
+        )
+
+    # ------------------------------------------
+    # 기본 응답 구조 검증
+    # ------------------------------------------
+
+    def test_simulate_returns_200(self, client: TestClient) -> None:
+        """유효한 요청에 200을 반환해야 한다."""
+        response = self._simulate(client, SRC_EPG_DN, DST_EPG_DN)
+        assert response.status_code == 200
+
+    def test_simulate_response_keys(self, client: TestClient) -> None:
+        """응답에 필수 키가 모두 포함되어야 한다."""
+        data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        required = {"verdict", "src_epg", "dst_epg", "src_tenant", "dst_tenant",
+                    "matched_contracts", "reason"}
+        assert required.issubset(data.keys())
+
+    def test_simulate_verdict_is_valid_value(self, client: TestClient) -> None:
+        """verdict 값은 ALLOW 또는 DENY여야 한다."""
+        data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        assert data["verdict"] in ("ALLOW", "DENY")
+
+    # ------------------------------------------
+    # DENY 판정 검증 (빈 ACIClient 응답 기반)
+    # ------------------------------------------
+
+    def test_simulate_deny_when_no_contracts(self, client: TestClient) -> None:
+        """Contract 없으면 DENY를 반환해야 한다 (ACI Whitelist 모델 기본값)."""
+        data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        assert data["verdict"] == "DENY"
+
+    def test_simulate_deny_has_empty_contracts(self, client: TestClient) -> None:
+        """DENY 판정 시 matched_contracts는 빈 리스트여야 한다."""
+        data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        assert data["matched_contracts"] == []
+
+    def test_simulate_deny_has_reason(self, client: TestClient) -> None:
+        """DENY 판정 시 reason 필드가 비어있지 않아야 한다."""
+        data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        assert len(data["reason"]) > 0
+
+    # ------------------------------------------
+    # ALLOW 판정 검증 (SimulatorEngine.simulate 패치)
+    # ------------------------------------------
+
+    def test_simulate_allow_verdict(self, client: TestClient) -> None:
+        """Contract가 존재하면 ALLOW를 반환해야 한다."""
+        with patch(
+            "services.simulator_engine.SimulatorEngine.simulate",
+            return_value=MOCK_SIMULATE_ALLOW,
+        ):
+            data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        assert data["verdict"] == "ALLOW"
+
+    def test_simulate_allow_contains_contract(self, client: TestClient) -> None:
+        """ALLOW 판정 시 matched_contracts에 Contract 정보가 포함되어야 한다."""
+        with patch(
+            "services.simulator_engine.SimulatorEngine.simulate",
+            return_value=MOCK_SIMULATE_ALLOW,
+        ):
+            data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        assert len(data["matched_contracts"]) > 0
+        assert data["matched_contracts"][0]["name"] == "web-to-db"
+
+    def test_simulate_allow_contract_has_subjects(self, client: TestClient) -> None:
+        """ALLOW 판정 Contract에 Subject 및 Filter 정보가 포함되어야 한다."""
+        with patch(
+            "services.simulator_engine.SimulatorEngine.simulate",
+            return_value=MOCK_SIMULATE_ALLOW,
+        ):
+            data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
+        contract = data["matched_contracts"][0]
+        assert len(contract["subjects"]) > 0
+        assert len(contract["subjects"][0]["filters"]) > 0
+
+    # ------------------------------------------
+    # 유효성 검증 (400 / 422)
+    # ------------------------------------------
+
+    def test_simulate_same_epg_returns_400(self, client: TestClient) -> None:
+        """Source와 Destination EPG가 동일하면 400을 반환해야 한다."""
+        response = self._simulate(client, SRC_EPG_DN, SRC_EPG_DN)
+        assert response.status_code == 400
+
+    def test_simulate_missing_src_returns_422(self, client: TestClient) -> None:
+        """src_epg_dn 누락 시 422를 반환해야 한다."""
+        response = client.post(
+            "/api/simulate",
+            json={"dst_epg_dn": DST_EPG_DN},
+        )
+        assert response.status_code == 422
+
+    def test_simulate_missing_dst_returns_422(self, client: TestClient) -> None:
+        """dst_epg_dn 누락 시 422를 반환해야 한다."""
+        response = client.post(
+            "/api/simulate",
+            json={"src_epg_dn": SRC_EPG_DN},
+        )
+        assert response.status_code == 422

@@ -17,6 +17,7 @@ FastAPI 백엔드와 Bootstrap 프론트엔드로 구성되어 있습니다.
 | Capacity Report | TCAM 용량 리포트 |
 | Topology Viewer | Spine-Leaf 토폴로지 시각화 |
 | Config Linter | 설정 검증 및 Best Practice 감사 |
+| Microsegmentation Simulator | EPG 간 트래픽 허용/차단 판정 및 시각화 |
 
 ## 설치
 
@@ -64,6 +65,9 @@ docker compose up
 | GET /api/topology | 토폴로지 |
 | GET /api/lint | Config Linter (Live 조회) |
 | POST /api/lint/upload | Config Linter (JSON 파일 업로드) |
+| GET /api/simulate/tenants | Tenant 목록 조회 (드롭다운용) |
+| GET /api/simulate/epgs?tenant= | EPG 목록 조회 (드롭다운용) |
+| POST /api/simulate | 트래픽 허용/차단 판정 |
 | GET /api/all | 전체 데이터 |
 
 ## Config Linter
@@ -83,6 +87,20 @@ ACI 설정의 보안 취약점과 Best Practice 위반을 자동으로 탐지합
 
 Live Scan과 APIC export JSON 파일 업로드 두 가지 방식을 지원합니다.
 
+## Microsegmentation Simulator
+
+EPG 간 트래픽 허용/차단 여부를 ACI Whitelist 모델 기준으로 판정합니다.
+
+**판정 기준**
+- Source EPG(Consumer)와 Destination EPG(Provider)가 동일 Contract로 연결되어 있고, 해당 Contract에 Subject + Filter가 존재하면 ALLOW
+- 위 조건을 만족하는 Contract가 없으면 ACI 기본 정책(Deny-All) 적용 → DENY
+
+**사용 방법**
+1. Source Tenant / EPG 선택
+2. Destination Tenant / EPG 선택
+3. Simulate 버튼 클릭
+4. 판정 결과, 경로 다이어그램, Contract 상세 확인
+
 ## 프로젝트 구조
 ```
 aci-ops-webui/
@@ -101,7 +119,8 @@ aci-ops-webui/
 │   ├── config.yaml.example      # APIC 설정 템플릿
 │   ├── services/
 │   │   ├── aci_client.py        # ACI API 클라이언트
-│   │   └── linter_engine.py     # Config Linter 규칙 엔진
+│   │   ├── linter_engine.py     # Config Linter 규칙 엔진
+│   │   └── simulator_engine.py  # Microsegmentation Simulator 엔진
 │   └── routers/
 │       ├── health.py
 │       ├── policy.py
@@ -110,12 +129,13 @@ aci-ops-webui/
 │       ├── audit.py
 │       ├── capacity.py
 │       ├── topology.py
-│       └── linter.py            # Config Linter API
+│       ├── linter.py            # Config Linter API
+│       └── simulator.py         # Microsegmentation Simulator API
 ├── frontend/
 │   └── index.html               # 대시보드 UI (시멘틱 HTML)
 └── tests/
     ├── conftest.py              # pytest 패치 설정
-    └── test_api.py              # API 단위 테스트 (41 passed, 1 skipped)
+    └── test_api.py              # API 단위 테스트 (58 passed, 1 skipped)
 ```
 
 ## 환경

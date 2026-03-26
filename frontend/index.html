@@ -44,20 +44,17 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
-        /* header — 네비게이션 바 */
         header .navbar {
             background-color: var(--bg-navbar) !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         header .navbar-brand { font-weight: 700; }
 
-        /* main — 페이지 본문 */
         main {
             padding: 1.5rem 1rem;
             margin-bottom: 60px;
         }
 
-        /* footer — 하단 상태 바 */
         footer.status-bar {
             background: var(--bg-card);
             border-top: 1px solid var(--border-color);
@@ -73,7 +70,6 @@
 
         /* ============================================
            카드 공통 스타일
-           article.card — 독립적인 콘텐츠 단위
            ============================================ */
         article.card {
             background: var(--bg-card);
@@ -94,7 +90,6 @@
            섹션별 스타일
            ============================================ */
 
-        /* 상단 통계 섹션 */
         section.stats-section .stat-card {
             text-align: center;
             padding: 20px;
@@ -102,7 +97,6 @@
         section.stats-section .stat-value { font-size: 2.5rem; font-weight: 700; }
         section.stats-section .stat-label { font-size: 0.85rem; color: var(--text-muted); }
 
-        /* Endpoint 검색 섹션 */
         section.search-section {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -178,13 +172,55 @@
         }
 
         /* ============================================
+           Microsegmentation Simulator (v1.4.0)
+           ============================================ */
+
+        /* EPG 선택 레이블 */
+        .sim-epg-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        /* 판정 결과 배지 */
+        .verdict-badge {
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 8px 28px;
+            border-radius: 50px;
+            letter-spacing: 2px;
+        }
+        .verdict-allow { background: #d1fae5; color: #065f46; border: 2px solid #34d399; }
+        .verdict-deny  { background: #fee2e2; color: #7f1d1d; border: 2px solid #f87171; }
+
+        [data-theme="dark"] .verdict-allow { background: #064e3b; color: #6ee7b7; border-color: #10b981; }
+        [data-theme="dark"] .verdict-deny  { background: #450a0a; color: #fca5a5; border-color: #ef4444; }
+
+        /* 시뮬레이터 SVG 다이어그램 영역 */
+        .sim-diagram {
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Contract 상세 테이블 */
+        .sim-contract-detail {
+            font-size: 0.82rem;
+        }
+
+        /* ============================================
            다크 모드 오버라이드
            ============================================ */
         [data-theme="dark"] .modal-content {
             background: var(--bg-card);
             color: var(--text-main);
         }
-        [data-theme="dark"] .form-control {
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-select {
             background: var(--bg-body);
             border-color: var(--border-color);
             color: var(--text-main);
@@ -214,12 +250,14 @@
         [data-theme="dark"] .layer-label      { color: #a0aec0; }
         [data-theme="dark"] .topology-container { color: #f8f9fa; }
         [data-theme="dark"] .table-danger     { --bs-table-bg: rgba(220, 53, 69, 0.15); --bs-table-color: var(--text-main); }
+        [data-theme="dark"] .sim-diagram      { background: #0f172a; border-color: var(--border-color); }
+        [data-theme="dark"] .sim-epg-label    { color: var(--text-muted); }
     </style>
 </head>
 <body>
 
     <!-- ============================================
-         로딩 오버레이 (role="status" — 접근성)
+         로딩 오버레이
          ============================================ -->
     <div id="loading-overlay" role="status" aria-live="polite">
         <div class="spinner-box">
@@ -229,7 +267,7 @@
     </div>
 
     <!-- ============================================
-         header — 사이트 헤더 / 네비게이션
+         header — 네비게이션
          ============================================ -->
     <header>
         <nav class="navbar navbar-expand-lg navbar-dark sticky-top" aria-label="메인 네비게이션">
@@ -256,7 +294,7 @@
     </header>
 
     <!-- ============================================
-         main — 페이지 본문 전체
+         main — 페이지 본문
          ============================================ -->
     <main class="container-fluid">
 
@@ -439,6 +477,93 @@
             </div>
         </section>
 
+        <!-- ----------------------------------------
+             section: Microsegmentation Simulator (v1.4.0)
+             EPG 간 트래픽 허용/차단 시뮬레이션
+             ---------------------------------------- -->
+        <section aria-label="Microsegmentation Simulator">
+            <div class="row mt-2">
+                <div class="col-12">
+                    <article class="card" aria-label="Microsegmentation Simulator">
+                        <header class="card-header d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-signpost-split me-2" aria-hidden="true"></i>
+                                Microsegmentation Simulator
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    onclick="loadSimulatorTenants()" aria-label="Tenant 목록 새로고침">
+                                <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reload Tenants
+                            </button>
+                        </header>
+                        <div class="card-body">
+
+                            <!-- EPG 선택 영역 -->
+                            <div class="row g-3 align-items-end mb-4">
+
+                                <!-- Source EPG (Consumer) -->
+                                <div class="col-md-5">
+                                    <p class="sim-epg-label mb-1">
+                                        <i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>
+                                        Source EPG (Consumer)
+                                    </p>
+                                    <select class="form-select form-select-sm mb-2"
+                                            id="sim-src-tenant"
+                                            aria-label="Source Tenant 선택"
+                                            onchange="populateEpgs('src', this.value)">
+                                        <option value="">-- Tenant 선택 --</option>
+                                    </select>
+                                    <select class="form-select form-select-sm"
+                                            id="sim-src-epg"
+                                            aria-label="Source EPG 선택">
+                                        <option value="">-- EPG 선택 --</option>
+                                    </select>
+                                </div>
+
+                                <!-- 방향 화살표 + Simulate 버튼 -->
+                                <div class="col-md-2 text-center">
+                                    <i class="bi bi-arrow-right fs-3 text-muted d-none d-md-block mb-2"
+                                       aria-hidden="true"></i>
+                                    <button class="btn btn-primary w-100"
+                                            onclick="runSimulation()">
+                                        <i class="bi bi-play-fill me-1" aria-hidden="true"></i>Simulate
+                                    </button>
+                                </div>
+
+                                <!-- Destination EPG (Provider) -->
+                                <div class="col-md-5">
+                                    <p class="sim-epg-label mb-1">
+                                        <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>
+                                        Destination EPG (Provider)
+                                    </p>
+                                    <select class="form-select form-select-sm mb-2"
+                                            id="sim-dst-tenant"
+                                            aria-label="Destination Tenant 선택"
+                                            onchange="populateEpgs('dst', this.value)">
+                                        <option value="">-- Tenant 선택 --</option>
+                                    </select>
+                                    <select class="form-select form-select-sm"
+                                            id="sim-dst-epg"
+                                            aria-label="Destination EPG 선택">
+                                        <option value="">-- EPG 선택 --</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- 시뮬레이션 결과 영역 -->
+                            <div id="simulator-result"
+                                 role="region" aria-live="polite" aria-label="시뮬레이션 결과">
+                                <div class="text-center text-muted py-3">
+                                    <i class="bi bi-signpost-split fs-1 d-block mb-2" aria-hidden="true"></i>
+                                    Tenant와 EPG를 선택한 후 Simulate 버튼을 클릭하세요
+                                </div>
+                            </div>
+
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- ============================================
@@ -490,6 +615,7 @@
             loadAll();
             setupAutoRefresh();
             loadTheme();
+            loadSimulatorTenants();
         };
 
         // ============================================
@@ -906,6 +1032,340 @@
             });
             html += '</tbody></table></div>';
             document.getElementById("linter-content").innerHTML = html;
+        }
+
+        // ============================================
+        // Microsegmentation Simulator (v1.4.0)
+        // ============================================
+
+        /**
+         * 페이지 로드 시 Tenant 목록을 APIC에서 수집하여
+         * Source / Destination 드롭다운에 채운다.
+         */
+        async function loadSimulatorTenants() {
+            const srcSel = document.getElementById('sim-src-tenant');
+            const dstSel = document.getElementById('sim-dst-tenant');
+
+            // 기존 옵션 초기화 (기본 옵션 유지)
+            srcSel.innerHTML = '<option value="">-- Tenant 선택 --</option>';
+            dstSel.innerHTML = '<option value="">-- Tenant 선택 --</option>';
+
+            try {
+                const response = await fetch('/api/simulate/tenants');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const tenants = await response.json();
+
+                tenants.forEach(t => {
+                    const opt = `<option value="${t.name}">${t.name}</option>`;
+                    srcSel.insertAdjacentHTML('beforeend', opt);
+                    dstSel.insertAdjacentHTML('beforeend', opt);
+                });
+            } catch (error) {
+                // Tenant 조회 실패는 조용히 처리 (APIC 미연결 환경 고려)
+                console.warn('Tenant 목록 조회 실패:', error.message);
+            }
+        }
+
+        /**
+         * Tenant 선택 시 해당 Tenant의 EPG 목록을 조회하여
+         * Source 또는 Destination EPG 드롭다운을 채운다.
+         *
+         * @param {string} side  - 'src' 또는 'dst'
+         * @param {string} tenant - 선택된 Tenant 이름
+         */
+        async function populateEpgs(side, tenant) {
+            const epgSel = document.getElementById(`sim-${side}-epg`);
+            epgSel.innerHTML = '<option value="">-- EPG 선택 --</option>';
+
+            if (!tenant) return;
+
+            epgSel.innerHTML = '<option value="">로딩 중...</option>';
+            try {
+                const response = await fetch(
+                    `/api/simulate/epgs?tenant=${encodeURIComponent(tenant)}`
+                );
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const epgs = await response.json();
+
+                epgSel.innerHTML = '<option value="">-- EPG 선택 --</option>';
+                epgs.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value       = e.dn;
+                    opt.textContent = e.display;   // "AppProfile / EPG이름"
+                    epgSel.appendChild(opt);
+                });
+            } catch (error) {
+                epgSel.innerHTML = '<option value="">EPG 조회 실패</option>';
+                console.error('EPG 목록 조회 실패:', error.message);
+            }
+        }
+
+        /**
+         * 시뮬레이션 실행
+         * Source / Destination EPG DN을 POST /api/simulate 로 전송하고
+         * 결과를 renderSimulationResult()로 렌더링한다.
+         */
+        async function runSimulation() {
+            const srcDn = document.getElementById('sim-src-epg').value;
+            const dstDn = document.getElementById('sim-dst-epg').value;
+
+            if (!srcDn || !dstDn) {
+                alert('Source EPG와 Destination EPG를 모두 선택하세요.');
+                return;
+            }
+            if (srcDn === dstDn) {
+                alert('Source EPG와 Destination EPG가 동일합니다.');
+                return;
+            }
+
+            // 로딩 표시
+            document.getElementById('simulator-result').innerHTML = `
+                <div class="text-center py-4" role="status">
+                    <div class="spinner-border text-primary" aria-hidden="true"></div>
+                    <p class="mt-2 text-muted">시뮬레이션 실행 중...</p>
+                </div>`;
+
+            try {
+                const response = await fetch('/api/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ src_epg_dn: srcDn, dst_epg_dn: dstDn })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                renderSimulationResult(await response.json());
+            } catch (error) {
+                document.getElementById('simulator-result').innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+                        시뮬레이션 실패: ${error.message}
+                    </div>`;
+            }
+        }
+
+        /**
+         * 시뮬레이션 결과 렌더링
+         * 1) 판정 배지 (ALLOW / DENY)
+         * 2) SVG 경로 다이어그램
+         * 3) Contract / Subject / Filter 상세 테이블
+         *
+         * @param {Object} data - POST /api/simulate 응답
+         */
+        function renderSimulationResult(data) {
+            const isAllow  = data.verdict === 'ALLOW';
+            const color    = isAllow ? '#10b981' : '#ef4444';
+            const bgVerdict = isAllow ? 'verdict-allow' : 'verdict-deny';
+            const icon     = isAllow ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+
+            // ------------------------------------------
+            // 1) 판정 배지 + reason
+            // ------------------------------------------
+            let html = `
+                <div class="text-center mb-4">
+                    <span class="verdict-badge ${bgVerdict}">
+                        <i class="bi ${icon} me-2" aria-hidden="true"></i>${data.verdict}
+                    </span>
+                    <p class="text-muted mt-3 mb-0" style="font-size:0.9rem">${data.reason}</p>
+                </div>`;
+
+            // ------------------------------------------
+            // 2) SVG 경로 다이어그램
+            // ------------------------------------------
+            html += `<div class="sim-diagram mb-4">${buildSimDiagram(data)}</div>`;
+
+            // ------------------------------------------
+            // 3) Contract 상세 테이블 (ALLOW이고 Contract 있을 때만)
+            // ------------------------------------------
+            if (isAllow && data.matched_contracts.length > 0) {
+                html += `
+                    <div class="sim-contract-detail">
+                        <p class="fw-bold mb-2">
+                            <i class="bi bi-journal-text me-1" aria-hidden="true"></i>
+                            Matched Contract Details
+                        </p>`;
+
+                data.matched_contracts.forEach(contract => {
+                    html += `
+                        <div class="mb-3">
+                            <p class="mb-1">
+                                <span class="badge bg-success me-1">${contract.tenant}</span>
+                                <code>${contract.name}</code>
+                            </p>`;
+
+                    if (contract.subjects.length > 0) {
+                        html += `
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Subject</th>
+                                            <th scope="col">Filter</th>
+                                            <th scope="col">EtherType</th>
+                                            <th scope="col">Protocol</th>
+                                            <th scope="col">Dst Port</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                        contract.subjects.forEach(subj => {
+                            if (subj.filters.length === 0) {
+                                html += `
+                                    <tr>
+                                        <td>${subj.name}</td>
+                                        <td colspan="4"><span class="text-muted">No filters</span></td>
+                                    </tr>`;
+                            } else {
+                                subj.filters.forEach((f, idx) => {
+                                    const portRange = f.dst_from_port === f.dst_to_port
+                                        ? f.dst_from_port
+                                        : `${f.dst_from_port} - ${f.dst_to_port}`;
+                                    html += `
+                                        <tr>
+                                            ${idx === 0 ? `<td rowspan="${subj.filters.length}">${subj.name}</td>` : ''}
+                                            <td><code>${f.name}</code></td>
+                                            <td>${f.ether_type}</td>
+                                            <td>${f.ip_protocol}</td>
+                                            <td>${portRange}</td>
+                                        </tr>`;
+                                });
+                            }
+                        });
+                        html += '</tbody></table></div>';
+                    }
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            document.getElementById('simulator-result').innerHTML = html;
+        }
+
+        /**
+         * SVG 경로 다이어그램 생성
+         *
+         * ALLOW: [SRC EPG] ──contract이름──> [DST EPG]  (초록)
+         * DENY:  [SRC EPG] ──────X──────── [DST EPG]   (빨강, 점선)
+         *
+         * @param {Object} data - 시뮬레이션 결과
+         * @returns {string} SVG 마크업
+         */
+        function buildSimDiagram(data) {
+            const isAllow   = data.verdict === 'ALLOW';
+            const lineColor = isAllow ? '#10b981' : '#ef4444';
+            const boxColor  = isAllow ? '#d1fae5' : '#fee2e2';
+            const boxStroke = isAllow ? '#10b981' : '#ef4444';
+            const textColor = isAllow ? '#065f46' : '#7f1d1d';
+
+            // 다크모드 감지 (SVG 내부 텍스트 색 보정)
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            const labelColor = isDark ? '#94a3b8' : '#64748b';
+            const bgRect     = isDark ? '#0f172a'  : '#f8fafc';
+
+            // Contract 이름 (ALLOW: 첫 번째 Contract, DENY: "No Contract")
+            const contractLabel = isAllow && data.matched_contracts.length > 0
+                ? data.matched_contracts[0].name
+                : 'No Contract';
+
+            // EPG 이름 (30자 초과 시 말줄임)
+            const truncate = (str, n) => str.length > n ? str.slice(0, n - 1) + '…' : str;
+            const srcLabel  = truncate(data.src_epg, 18);
+            const dstLabel  = truncate(data.dst_epg, 18);
+            const conLabel  = truncate(contractLabel, 20);
+
+            // Subject/Filter 요약 (ALLOW이고 존재할 때)
+            let filterSummary = '';
+            if (isAllow && data.matched_contracts.length > 0) {
+                const firstSubj = data.matched_contracts[0].subjects[0];
+                if (firstSubj && firstSubj.filters.length > 0) {
+                    filterSummary = firstSubj.filters
+                        .slice(0, 2)
+                        .map(f => f.name)
+                        .join(', ');
+                    if (firstSubj.filters.length > 2) filterSummary += ' ...';
+                }
+            }
+
+            return `
+<svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg"
+     style="width:100%;height:auto;display:block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+
+  <!-- 배경 -->
+  <rect width="700" height="160" fill="${bgRect}"/>
+
+  <!-- ── Source EPG 박스 ── -->
+  <g>
+    <rect x="30" y="55" width="160" height="50" rx="8"
+          fill="${boxColor}" stroke="${boxStroke}" stroke-width="2"/>
+    <text x="110" y="74" text-anchor="middle" fill="${labelColor}"
+          font-size="9" font-weight="600" letter-spacing="1">SOURCE (Consumer)</text>
+    <text x="110" y="92" text-anchor="middle" fill="${textColor}"
+          font-size="13" font-weight="700">${srcLabel}</text>
+    <text x="110" y="107" text-anchor="middle" fill="${labelColor}"
+          font-size="9">${data.src_tenant}</text>
+  </g>
+
+  <!-- ── Destination EPG 박스 ── -->
+  <g>
+    <rect x="510" y="55" width="160" height="50" rx="8"
+          fill="${boxColor}" stroke="${boxStroke}" stroke-width="2"/>
+    <text x="590" y="74" text-anchor="middle" fill="${labelColor}"
+          font-size="9" font-weight="600" letter-spacing="1">DESTINATION (Provider)</text>
+    <text x="590" y="92" text-anchor="middle" fill="${textColor}"
+          font-size="13" font-weight="700">${dstLabel}</text>
+    <text x="590" y="107" text-anchor="middle" fill="${labelColor}"
+          font-size="9">${data.dst_tenant}</text>
+  </g>
+
+  ${isAllow ? `
+  <!-- ── ALLOW: Contract 박스 + 연결선 ── -->
+  <!-- 왼쪽 선 -->
+  <line x1="190" y1="80" x2="290" y2="80"
+        stroke="${lineColor}" stroke-width="2"/>
+  <!-- 오른쪽 선 -->
+  <line x1="410" y1="80" x2="510" y2="80"
+        stroke="${lineColor}" stroke-width="2"/>
+  <!-- 화살표 마커 -->
+  <defs>
+    <marker id="arrowAllow" markerWidth="8" markerHeight="8"
+            refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="${lineColor}"/>
+    </marker>
+  </defs>
+  <line x1="410" y1="80" x2="508" y2="80"
+        stroke="${lineColor}" stroke-width="2" marker-end="url(#arrowAllow)"/>
+  <!-- Contract 박스 -->
+  <rect x="290" y="58" width="120" height="44" rx="6"
+        fill="${boxColor}" stroke="${lineColor}" stroke-width="1.5"/>
+  <text x="350" y="76" text-anchor="middle" fill="${labelColor}"
+        font-size="8" font-weight="600" letter-spacing="0.5">CONTRACT</text>
+  <text x="350" y="91" text-anchor="middle" fill="${textColor}"
+        font-size="10" font-weight="700">${conLabel}</text>
+  <!-- Filter 요약 -->
+  ${filterSummary ? `
+  <text x="350" y="130" text-anchor="middle" fill="${labelColor}"
+        font-size="9">${filterSummary}</text>
+  ` : ''}
+  ` : `
+  <!-- ── DENY: 점선 + X 마크 ── -->
+  <defs>
+    <marker id="arrowDeny" markerWidth="8" markerHeight="8"
+            refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="${lineColor}"/>
+    </marker>
+  </defs>
+  <line x1="190" y1="80" x2="508" y2="80"
+        stroke="${lineColor}" stroke-width="2"
+        stroke-dasharray="8,5" marker-end="url(#arrowDeny)"/>
+  <!-- X 마크 원 -->
+  <circle cx="350" cy="80" r="18" fill="#fee2e2" stroke="${lineColor}" stroke-width="2"/>
+  <line x1="340" y1="70" x2="360" y2="90" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="360" y1="70" x2="340" y2="90" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- DENY 레이블 -->
+  <text x="350" y="120" text-anchor="middle" fill="${lineColor}"
+        font-size="10" font-weight="700">DENY (No Contract)</text>
+  `}
+</svg>`;
         }
     </script>
 </body>

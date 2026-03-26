@@ -1,7 +1,7 @@
 # ============================================
 # ACI Ops WebUI - Backend Main
 # 목적: FastAPI 애플리케이션 진입점
-# 버전: v1.3.0 - Config Linter 추가
+# 버전: v1.4.0 - Microsegmentation Simulator 추가
 #
 # 실행 방법:
 #   cd backend
@@ -31,11 +31,12 @@ from routers.audit import get_audit_data
 from routers.capacity import get_capacity_data
 from routers.topology import get_topology_data
 from routers.linter import get_lint_data, lint_upload
+from routers.simulator import get_simulate_router
 
 # ============================================
 # FastAPI 앱 인스턴스 생성
 # ============================================
-app = FastAPI(title="ACI Ops WebUI", version="1.3.0")
+app = FastAPI(title="ACI Ops WebUI", version="1.4.0")
 
 # ============================================
 # ACI 클라이언트 초기화
@@ -46,6 +47,11 @@ aci = ACIClient()
 # Static 파일 서빙 설정
 # ============================================
 app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+
+# ============================================
+# 라우터 등록
+# ============================================
+app.include_router(get_simulate_router(aci))
 
 
 # ============================================
