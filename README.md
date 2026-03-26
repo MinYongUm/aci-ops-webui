@@ -16,6 +16,7 @@ FastAPI 백엔드와 Bootstrap 프론트엔드로 구성되어 있습니다.
 | Audit Log | 설정 변경 이력 조회 |
 | Capacity Report | TCAM 용량 리포트 |
 | Topology Viewer | Spine-Leaf 토폴로지 시각화 |
+| Config Linter | 설정 검증 및 Best Practice 감사 |
 
 ## 설치
 
@@ -39,7 +40,10 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 ## Docker (로컬 개발 환경)
 ```
-# .env.example 복사 후 수정
+# config.yaml 준비
+copy backend\config.yaml.example backend\config.yaml
+
+# .env 준비
 copy .env.example .env
 
 # 컨테이너 실행
@@ -58,18 +62,37 @@ docker compose up
 | GET /api/audit | Audit Log |
 | GET /api/capacity | 용량 리포트 |
 | GET /api/topology | 토폴로지 |
+| GET /api/lint | Config Linter (Live 조회) |
+| POST /api/lint/upload | Config Linter (JSON 파일 업로드) |
 | GET /api/all | 전체 데이터 |
+
+## Config Linter
+
+ACI 설정의 보안 취약점과 Best Practice 위반을 자동으로 탐지합니다.
+
+| Rule ID | 분류 | 탐지 내용 |
+|---------|------|-----------|
+| SEC-001 | Security | permitAll 계열 위험 Contract |
+| SEC-002 | Security | Subject 없는 빈 Contract |
+| SEC-003 | Security | Filter 없는 빈 Subject |
+| BP-001 | Best Practice | BD 미연결 EPG |
+| BP-002 | Best Practice | Contract 미연결 고립 EPG |
+| BP-003 | Best Practice | Subnet 없는 BD |
+| NM-001 | Naming | 이름 내 공백/특수문자 |
+| NM-002 | Naming | Prefix 규칙 위반 (config.yaml 정의 시) |
+
+Live Scan과 APIC export JSON 파일 업로드 두 가지 방식을 지원합니다.
 
 ## 프로젝트 구조
 ```
 aci-ops-webui/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml               # GitHub Actions CI
+│       └── ci.yml               # GitHub Actions CI (Slack 알림 포함)
 ├── .flake8                      # flake8 설정
 ├── .env.example                 # 환경변수 템플릿
 ├── Dockerfile                   # 컨테이너 이미지
-├── docker_compose.yml           # 로컬 개발 환경
+├── docker-compose.yml           # 로컬 개발 환경
 ├── requirements.txt             # 런타임 의존성
 ├── requirements_dev.txt         # 개발 의존성
 ├── backend/
@@ -77,7 +100,8 @@ aci-ops-webui/
 │   ├── config.yaml              # APIC 설정 (gitignore)
 │   ├── config.yaml.example      # APIC 설정 템플릿
 │   ├── services/
-│   │   └── aci_client.py        # ACI API 클라이언트
+│   │   ├── aci_client.py        # ACI API 클라이언트
+│   │   └── linter_engine.py     # Config Linter 규칙 엔진
 │   └── routers/
 │       ├── health.py
 │       ├── policy.py
@@ -85,12 +109,13 @@ aci-ops-webui/
 │       ├── endpoint.py
 │       ├── audit.py
 │       ├── capacity.py
-│       └── topology.py
+│       ├── topology.py
+│       └── linter.py            # Config Linter API
 ├── frontend/
-│   └── index.html               # 대시보드 UI
+│   └── index.html               # 대시보드 UI (시멘틱 HTML)
 └── tests/
     ├── conftest.py              # pytest 패치 설정
-    └── test_api.py              # API 단위 테스트
+    └── test_api.py              # API 단위 테스트 (41 passed, 1 skipped)
 ```
 
 ## 환경
