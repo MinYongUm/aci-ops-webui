@@ -18,6 +18,12 @@
 #     → APIC 접속 정보 보안을 위해 볼륨 마운트로 주입
 #   - requirements.txt 만 설치 (dev 도구 제외)
 #     → Docker 이미지 경량화
+#
+# [pip --trusted-host 옵션]
+#   - 회사 네트워크 SSL 검사 프록시 대응
+#   - 프록시가 PyPI 연결을 자체 서명 인증서로 교체하는 환경에서
+#     pip CERTIFICATE_VERIFY_FAILED 오류 방지
+#   - 집 환경에서도 해당 옵션은 무해하므로 공통 적용
 # ============================================================
 
 # ============================================================
@@ -38,7 +44,11 @@ WORKDIR /app
 # → 코드 변경 시 의존성 레이어 캐시 재사용 가능
 # ============================================================
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir \
+    --trusted-host pypi.org \
+    --trusted-host pypi.python.org \
+    --trusted-host files.pythonhosted.org \
+    -r requirements.txt
 
 # ============================================================
 # 소스 코드 복사
