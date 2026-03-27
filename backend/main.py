@@ -151,8 +151,7 @@ app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 app.include_router(setup_router)
 
 # Simulator: ACIClient 의존 (aci가 None이면 setup 완료 후 재기동 시 정상 등록)
-if aci is not None:
-    app.include_router(get_simulate_router(aci))
+app.include_router(get_simulate_router(aci))
 
 
 # ============================================
