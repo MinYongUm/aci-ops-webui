@@ -181,12 +181,14 @@ def client() -> TestClient:
     ACIClient.__init__ 과 ACIClient.login 을 Mock 처리하여
     실제 APIC 접속 없이 테스트가 실행되도록 한다.
     """
-    with patch("main.ACIClient") as mock_aci_class:
+    with (
+        patch("main.ACIClient") as mock_aci_class,
+        patch("main.os.path.exists", return_value=True),  # 추가
+    ):
         mock_aci_instance = MagicMock()
         mock_aci_class.return_value = mock_aci_instance
-        mock_aci_instance.get.return_value = []  # Linter/Simulator Live Scan용 빈 배열
+        mock_aci_instance.get.return_value = []
 
-        # 각 라우터 함수가 참조하는 데이터 반환값 설정
         with (
             patch("main.get_health_data", return_value=MOCK_HEALTH),
             patch("main.get_policy_data", return_value=MOCK_POLICY),
