@@ -226,6 +226,19 @@ else
     info "config.yaml 없음 — 서버 기동 후 브라우저에서 초기 설정을 진행하세요."
 fi
 
+# .env 생성 (.env.example 복사, 없으면 빈 파일 생성)
+if [[ ! -f "${INSTALL_DIR}/.env" ]]; then
+    if [[ -f "${INSTALL_DIR}/.env.example" ]]; then
+        cp "${INSTALL_DIR}/.env.example" "${INSTALL_DIR}/.env"
+        success ".env 생성 완료 (.env.example 복사)"
+    else
+        touch "${INSTALL_DIR}/.env"
+        success ".env 생성 완료 (빈 파일)"
+    fi
+else
+    info ".env 이미 존재 — 유지합니다."
+fi
+
 # 임시 디렉토리 정리
 rm -rf "${WORK_DIR}"
 
