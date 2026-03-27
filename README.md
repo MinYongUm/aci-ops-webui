@@ -19,7 +19,18 @@ FastAPI 백엔드와 Bootstrap 프론트엔드로 구성되어 있습니다.
 | Config Linter | 설정 검증 및 Best Practice 감사 |
 | Microsegmentation Simulator | EPG 간 트래픽 허용/차단 판정 및 시각화 |
 
-## 설치
+## 설치 (Ubuntu + Docker — 권장)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MinYongUm/aci-ops-webui/main/install.sh | bash
+```
+
+설치 완료 후 브라우저에서 접속하면 초기 설정 페이지(`/setup`)로 자동 이동합니다.
+APIC 접속 정보를 입력하고 Test Connection → Save를 완료하면 대시보드를 사용할 수 있습니다.
+
+업데이트 시 동일 명령을 재실행합니다. 기존 APIC 설정(config.yaml)은 자동으로 보존됩니다.
+
+## 설치 (수동)
 
 운영 환경 (FastAPI 앱 실행)
 ```
@@ -40,6 +51,9 @@ pip3 install -r requirements_dev.txt --break-system-packages \
 ```
 
 ## 설정
+
+APIC 접속 정보는 설치 후 브라우저의 `/setup` 페이지에서 입력할 수 있습니다.
+수동으로 설정하려면 아래와 같이 config.yaml을 직접 작성합니다.
 
 ```
 cd backend
@@ -74,13 +88,10 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 ## Docker (로컬 개발 환경)
 ```
-# config.yaml 준비
-copy backend\config.yaml.example backend\config.yaml
-
 # .env 준비
 copy .env.example .env
 
-# 컨테이너 실행
+# 컨테이너 실행 (config.yaml은 /setup 페이지에서 설정)
 docker compose up --build -d
 ```
 
@@ -88,6 +99,9 @@ docker compose up --build -d
 
 | Endpoint | 설명 |
 |----------|------|
+| GET /setup | 초기 설정 페이지 (config.yaml 미존재 시 자동 리다이렉트) |
+| POST /api/setup/test | APIC 연결 테스트 |
+| POST /api/setup/save | APIC 설정 저장 |
 | GET /api/health | 헬스 체크 |
 | GET /api/policy | 정책 검증 |
 | GET /api/interface | 인터페이스 상태 |
@@ -144,6 +158,7 @@ aci-ops-webui/
 ├── .env.example                 # 환경변수 템플릿
 ├── Dockerfile                   # 컨테이너 이미지
 ├── docker-compose.yml           # 로컬 개발 환경
+├── install.sh                   # Ubuntu + Docker 원스텝 설치 스크립트
 ├── requirements.txt             # 런타임 의존성
 ├── requirements_dev.txt         # 개발 의존성
 ├── backend/
@@ -163,9 +178,11 @@ aci-ops-webui/
 │       ├── capacity.py
 │       ├── topology.py
 │       ├── linter.py            # Config Linter API
-│       └── simulator.py         # Microsegmentation Simulator API
+│       ├── simulator.py         # Microsegmentation Simulator API
+│       └── setup.py             # 초기 설정 API
 ├── frontend/
 │   ├── index.html               # 대시보드 HTML 뼈대 (v1.8.0)
+│   ├── setup.html               # 초기 설정 페이지 (v1.9.0)
 │   ├── css/
 │   │   └── style.css            # Cisco DevNet 다크 테마 (v1.8.0)
 │   └── js/
@@ -182,7 +199,7 @@ aci-ops-webui/
 │       └── simulator.js
 └── tests/
     ├── conftest.py              # pytest 패치 설정
-    └── test_api.py              # API 단위 테스트 (61 passed, 1 skipped)
+    └── test_api.py              # API 단위 테스트 (74 passed, 1 skipped)
 ```
 
 ## 테스트
@@ -191,7 +208,7 @@ aci-ops-webui/
 pytest tests/ -v
 ```
 
-v1.8.0 기준: 61 passed, 1 skipped
+v1.9.0 기준: 74 passed, 1 skipped
 
 Ubuntu 서버에서 pytest PATH 미인식 시:
 ```

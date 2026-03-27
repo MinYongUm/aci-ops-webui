@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.9.0] - 2026-03-27
+### Added
+- 초기 설정 UI (`/setup` 페이지) — config.yaml 미존재 시 자동 리다이렉트
+- POST /api/setup/test — APIC 연결 테스트 API (config.yaml 저장 없음)
+- POST /api/setup/save — APIC 연결 테스트 후 config.yaml 저장 및 ACIClient 재초기화
+- SetupRedirectMiddleware — config.yaml 없을 때 `/setup` 이외 모든 요청 차단
+- `install.sh` — Ubuntu + Docker 환경 원스텝 설치/업데이트 스크립트
+  - GitHub API로 최신 태그 조회 후 zip 다운로드
+  - Docker 미설치 시 자동 설치 또는 안내 선택
+  - 업데이트 시 기존 config.yaml 자동 보존
+- 테스트 13개 추가 (74 passed, 1 skipped)
+
+### Fixed
+- ACIClient 지연 초기화 — config.yaml 없어도 서버 정상 기동
+- CI 환경 `os.path.exists` 패치 추가 (client fixture)
+- Simulator 라우터 항상 등록 (aci None 여부 무관)
+
 ## [1.8.0] - 2026-03-27
 
 ### Added
