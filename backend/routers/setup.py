@@ -40,12 +40,21 @@ class SetupRequest(BaseModel):
     retry: int = 3  # 재시도 횟수
 
 
+class HostResult(BaseModel):
+    """단일 APIC 호스트 연결 테스트 결과"""
+
+    host: str  # 정규화된 APIC 주소
+    ok: bool  # 연결 성공 여부
+    reason: str = ""  # 실패 시 원인 (성공 시 빈 문자열)
+
+
 class SetupResponse(BaseModel):
     """초기 설정 응답 스키마"""
 
     success: bool
     message: str
-    connected_host: str = ""  # 실제 연결된 APIC 주소
+    connected_host: str = ""  # Failover 기준 첫 번째 성공 호스트
+    host_results: List[HostResult] = []  # per-host 연결 테스트 결과 (신규)
 
 
 class ConfigResponse(BaseModel):
@@ -79,10 +88,6 @@ def _test_connection(host: str, username: str, password: str, timeout: int) -> b
     Returns:
         bool: 연결 성공 여부
     """
-    # https:// 미포함 시 자동 추가
-    if not host.startswith("http"):
-        host = f"https://{host}"
-
     auth_payload = {
         "aaaUser": {
             "attributes": {
@@ -130,17 +135,22 @@ async def setup_test(req: SetupRequest) -> SetupResponse:
     """
     APIC 연결 테스트 API
 
-    - hosts 리스트 순서대로 연결 시도
-    - 첫 번째 성공한 호스트 반환
+    - hosts 리스트 전체를 순서대로 테스트 (중단 없이 전체 실행)
+    - 1개 이상 성공 시 success=True
+    - connected_host: Failover 기준 첫 번째 성공 호스트
+    - host_results: 호스트별 성공/실패 상세 결과
     - config.yaml 저장 안 함
 
     Args:
         req: SetupRequest (hosts, username, password, timeout)
     Returns:
-        SetupResponse: 연결 성공 여부 + 연결된 호스트
+        SetupResponse: 연결 성공 여부 + 호스트별 결과
     """
     if not req.hosts:
         return SetupResponse(success=False, message="APIC 주소를 1개 이상 입력하세요.")
+
+    host_results: List[HostResult] = []
+    first_connected: str = ""
 
     for raw_host in req.hosts:
         host = _normalize_host(raw_host)
@@ -153,24 +163,39 @@ async def setup_test(req: SetupRequest) -> SetupResponse:
 
             if ok:
                 logger.info("APIC 연결 성공: %s", host)
-                return SetupResponse(
-                    success=True,
-                    message=f"연결 성공: {host}",
-                    connected_host=host,
-                )
+                if not first_connected:
+                    first_connected = host
+                host_results.append(HostResult(host=host, ok=True))
             else:
                 logger.warning("APIC 인증 실패: %s", host)
+                host_results.append(HostResult(host=host, ok=False, reason="인증 실패"))
 
         except requests.exceptions.ConnectionError:
             logger.warning("APIC 연결 불가: %s", host)
+            host_results.append(HostResult(host=host, ok=False, reason="연결 불가"))
         except requests.exceptions.Timeout:
             logger.warning("APIC 응답 타임아웃: %s", host)
+            host_results.append(HostResult(host=host, ok=False, reason="응답 타임아웃"))
         except Exception as e:
             logger.error("APIC 연결 중 예외 발생: %s — %s", host, e)
+            host_results.append(HostResult(host=host, ok=False, reason="예외 발생"))
+
+    success = any(r.ok for r in host_results)
+
+    if success:
+        ok_count = sum(1 for r in host_results if r.ok)
+        message = f"{ok_count}/{len(host_results)}개 호스트 연결 성공"
+        return SetupResponse(
+            success=True,
+            message=message,
+            connected_host=first_connected,
+            host_results=host_results,
+        )
 
     return SetupResponse(
         success=False,
         message="모든 APIC 주소에 연결할 수 없습니다. 주소, 계정, 비밀번호를 확인하세요.",
+        host_results=host_results,
     )
 
 

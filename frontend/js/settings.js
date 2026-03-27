@@ -1,6 +1,16 @@
 // ============================================================
 // settings.js — APIC 설정 관리
 // 버전: v1.9.1
+//
+// 담당 섹션: Settings
+// API:
+//   GET  /api/setup/config  현재 설정 조회 (password 마스킹)
+//   POST /api/setup/test    연결 테스트 (전체 호스트 per-host 결과 반환)
+//   POST /api/setup/save    설정 저장 + ACIClient 재초기화
+//
+// password 처리 원칙:
+//   - GET 응답의 "********"는 폼에 채우지 않음
+//   - 저장 시 항상 재입력 필요
 // ============================================================
 
 // ============================================================
@@ -107,6 +117,7 @@ async function loadSettings() {
             _settingsHosts = data.hosts.length > 0 ? data.hosts.slice() : [''];
             var usernameEl = document.getElementById('settings-username');
             if (usernameEl) usernameEl.value = data.username;
+            // password는 마스킹값을 채우지 않음 — 재입력 유도
         } else {
             _settingsHosts = [''];
         }
@@ -119,7 +130,9 @@ async function loadSettings() {
         var resultEl = document.getElementById('settings-result');
         if (resultEl) {
             resultEl.innerHTML =
-                '<div class="alert alert-warning">설정을 불러오지 못했습니다.</div>';
+                '<div class="alert alert-warning">' +
+                '<i class="bi bi-exclamation-triangle me-1"></i>' +
+                '설정을 불러오지 못했습니다.</div>';
         }
     }
 
@@ -130,34 +143,70 @@ async function loadSettings() {
 // VALIDATE — 공통 입력값 검증
 // ============================================================
 function _validateSettingsInput() {
-    var hosts    = _settingsHosts.filter(function (h) { return h.trim(); });
-    var username = document.getElementById('settings-username').value.trim();
-    var password = document.getElementById('settings-password').value;
-    var resultEl = document.getElementById('settings-result');
+    var hosts      = _settingsHosts.filter(function (h) { return h.trim(); });
+    var usernameEl = document.getElementById('settings-username');
+    var passwordEl = document.getElementById('settings-password');
+    var resultEl   = document.getElementById('settings-result');
+
+    var username = usernameEl ? usernameEl.value.trim() : '';
+    var password = passwordEl ? passwordEl.value : '';
 
     if (hosts.length === 0) {
         if (resultEl) {
             resultEl.innerHTML =
-                '<div class="alert alert-warning">APIC 주소를 1개 이상 입력하세요.</div>';
+                '<div class="alert alert-warning">' +
+                '<i class="bi bi-exclamation-triangle me-1"></i>' +
+                'APIC 주소를 1개 이상 입력하세요.</div>';
         }
         return null;
     }
     if (!username) {
         if (resultEl) {
             resultEl.innerHTML =
-                '<div class="alert alert-warning">Username을 입력하세요.</div>';
+                '<div class="alert alert-warning">' +
+                '<i class="bi bi-exclamation-triangle me-1"></i>' +
+                'Username을 입력하세요.</div>';
         }
         return null;
     }
     if (!password) {
         if (resultEl) {
             resultEl.innerHTML =
-                '<div class="alert alert-warning">Password를 입력하세요.</div>';
+                '<div class="alert alert-warning">' +
+                '<i class="bi bi-exclamation-triangle me-1"></i>' +
+                'Password를 입력하세요.</div>';
         }
         return null;
     }
 
     return { hosts: hosts, username: username, password: password };
+}
+
+// ============================================================
+// RENDER HOST RESULTS — per-host 연결 상태 표시
+// ============================================================
+function _renderHostResults(hostResults) {
+    if (!hostResults || hostResults.length === 0) return '';
+
+    var html = '<div class="mb-3">';
+    hostResults.forEach(function (r) {
+        if (r.ok) {
+            html += '<div class="d-flex align-items-center gap-2 mb-1">' +
+                '<i class="bi bi-check-circle-fill text-success"></i>' +
+                '<span>' + escHtml(r.host) + '</span>' +
+                '</div>';
+        } else {
+            html += '<div class="d-flex align-items-center gap-2 mb-1">' +
+                '<i class="bi bi-x-circle-fill text-danger"></i>' +
+                '<span style="color:var(--text-muted)">' + escHtml(r.host) + '</span>' +
+                (r.reason
+                    ? '<small class="text-danger">(' + escHtml(r.reason) + ')</small>'
+                    : '') +
+                '</div>';
+        }
+    });
+    html += '</div>';
+    return html;
 }
 
 // ============================================================
@@ -167,6 +216,7 @@ async function testSettingsConnection() {
     var resultEl = document.getElementById('settings-result');
     if (resultEl) resultEl.innerHTML = '';
 
+    // 테스트 시작 시 Save 버튼 비활성화 (이전 성공 결과 무효화)
     var saveBtn = document.getElementById('btn-settings-save');
     if (saveBtn) saveBtn.disabled = true;
 
@@ -187,27 +237,28 @@ async function testSettingsConnection() {
             body: JSON.stringify(payload)
         });
 
+        // per-host 결과 + 전체 요약 메시지 렌더링
+        var html = _renderHostResults(result.host_results);
+
         if (result.success) {
-            if (resultEl) {
-                resultEl.innerHTML =
-                    '<div class="alert alert-success">' +
-                    '<i class="bi bi-check-circle me-1"></i>' +
-                    escHtml(result.message) + '</div>';
-            }
+            html += '<div class="alert alert-success mb-0">' +
+                '<i class="bi bi-check-circle me-1"></i>' +
+                escHtml(result.message) + '</div>';
+            if (resultEl) resultEl.innerHTML = html;
             if (saveBtn) saveBtn.disabled = false;
         } else {
-            if (resultEl) {
-                resultEl.innerHTML =
-                    '<div class="alert alert-danger">' +
-                    '<i class="bi bi-x-circle me-1"></i>' +
-                    escHtml(result.message) + '</div>';
-            }
+            html += '<div class="alert alert-danger mb-0">' +
+                '<i class="bi bi-x-circle me-1"></i>' +
+                escHtml(result.message) + '</div>';
+            if (resultEl) resultEl.innerHTML = html;
         }
 
     } catch (e) {
         if (resultEl) {
             resultEl.innerHTML =
-                '<div class="alert alert-danger">연결 테스트 중 오류가 발생했습니다.</div>';
+                '<div class="alert alert-danger">' +
+                '<i class="bi bi-x-circle me-1"></i>' +
+                '연결 테스트 중 오류가 발생했습니다.</div>';
         }
     }
 
@@ -253,6 +304,12 @@ async function saveSettings() {
             var pwEl = document.getElementById('settings-password');
             if (pwEl) pwEl.value = '';
 
+            // Save 버튼 비활성 유지 — 재테스트 유도
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Save';
+            }
+
         } else {
             if (resultEl) {
                 resultEl.innerHTML =
@@ -269,7 +326,9 @@ async function saveSettings() {
     } catch (e) {
         if (resultEl) {
             resultEl.innerHTML =
-                '<div class="alert alert-danger">저장 중 오류가 발생했습니다.</div>';
+                '<div class="alert alert-danger">' +
+                '<i class="bi bi-x-circle me-1"></i>' +
+                '저장 중 오류가 발생했습니다.</div>';
         }
         if (btn) {
             btn.disabled = false;
