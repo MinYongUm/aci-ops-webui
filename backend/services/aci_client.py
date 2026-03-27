@@ -142,9 +142,7 @@ class ACIClient:
                     )
 
                 except requests.exceptions.Timeout:
-                    logger.warning(
-                        "APIC 연결 타임아웃 (%ds): %s", self.timeout, host
-                    )
+                    logger.warning("APIC 연결 타임아웃 (%ds): %s", self.timeout, host)
 
                 except requests.exceptions.ConnectionError:
                     logger.warning("APIC 연결 오류 (ConnectionError): %s", host)
