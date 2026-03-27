@@ -69,6 +69,19 @@ app = FastAPI(
 aci: ACIClient | None = None
 
 
+def _config_ready() -> bool:
+    """
+    config.yaml이 존재하고 내용이 있는지 확인
+
+    - 파일 없음: False
+    - 빈 파일 (install.sh가 Docker 마운트용으로 미리 생성): False
+    - 내용 있음: True
+
+    Middleware에서 사용 — 테스트 픽스처에서 patch 가능
+    """
+    return os.path.exists(CONFIG_PATH) and os.path.getsize(CONFIG_PATH) > 0
+
+
 def _try_init_aci() -> ACIClient | None:
     """
     ACIClient 초기화 시도
@@ -108,11 +121,11 @@ _setup_module.reinitialize_aci = reinitialize_aci
 
 
 # ============================================
-# Middleware: config.yaml 미존재 시 /setup 리다이렉트
+# Middleware: config.yaml 미존재/비어있을 때 /setup 리다이렉트
 # ============================================
 class SetupRedirectMiddleware(BaseHTTPMiddleware):
     """
-    config.yaml 없을 때 /setup 이외 요청을 /setup으로 리다이렉트
+    config.yaml 없거나 비어있을 때 /setup 이외 요청을 /setup으로 리다이렉트
 
     통과 허용 경로:
     - /setup          (설정 페이지 HTML)
@@ -124,8 +137,9 @@ class SetupRedirectMiddleware(BaseHTTPMiddleware):
     ALLOWED_PREFIXES = ("/setup", "/api/setup", "/static", "/docs", "/openapi")
 
     async def dispatch(self, request: Request, call_next):
-        # config.yaml 존재하면 정상 통과
-        if os.path.exists(CONFIG_PATH):
+        # config.yaml 존재하고 내용 있으면 정상 통과
+        # 빈 파일(install.sh가 Docker 마운트용으로 생성)은 미설정으로 처리
+        if _config_ready():
             return await call_next(request)
 
         # 허용 경로는 통과
@@ -134,7 +148,7 @@ class SetupRedirectMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # 그 외 모든 요청 → /setup 리다이렉트
-        logger.info("config.yaml 없음 — %s → /setup 리다이렉트", path)
+        logger.info("config.yaml 미설정 — %s → /setup 리다이렉트", path)
         return RedirectResponse(url="/setup")
 
 
@@ -149,8 +163,6 @@ app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 # 라우터 등록
 # ============================================
 app.include_router(setup_router)
-
-# Simulator: ACIClient 의존 (aci가 None이면 setup 완료 후 재기동 시 정상 등록)
 app.include_router(get_simulate_router(aci))
 
 
@@ -251,9 +263,6 @@ async def api_all():
     - 모듈 단위 예외 발생 시 해당 모듈만 None 반환 (전체 실패 방지)
     - 대시보드 초기 로딩 시 사용
     """
-    # ============================================
-    # 실행할 모듈 목록 (키 이름, 함수) 쌍으로 정의
-    # ============================================
     tasks = {
         "health": get_health_data,
         "policy": get_policy_data,
@@ -266,12 +275,7 @@ async def api_all():
 
     results: dict = {}
 
-    # ============================================
-    # ThreadPoolExecutor — 모듈 수만큼 동시 실행
-    # max_workers=len(tasks): 모듈 추가/제거 시 자동 반영
-    # ============================================
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-        # Future 객체와 모듈 키 매핑
         future_to_key = {executor.submit(fn, aci): key for key, fn in tasks.items()}
 
         for future in as_completed(future_to_key):
@@ -279,7 +283,6 @@ async def api_all():
             try:
                 results[key] = future.result()
             except Exception as exc:
-                # 모듈 단위 예외 — 해당 모듈만 None, 나머지는 정상 반환
                 logger.error("/api/all 모듈 실행 오류 [%s]: %s", key, exc)
                 results[key] = None
 

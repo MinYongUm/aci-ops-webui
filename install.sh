@@ -249,6 +249,13 @@ step "Step 6. 서비스 시작"
 
 cd "${INSTALL_DIR}"
 
+# config.yaml 없으면 빈 파일 생성
+# Docker가 마운트 대상 파일이 없으면 디렉토리로 자동 생성하는 문제 방지
+if [[ ! -f "backend/config.yaml" ]]; then
+    touch "backend/config.yaml"
+    info "config.yaml 빈 파일 생성 완료 (/setup 페이지에서 설정 예정)"
+fi
+
 # 기존 컨테이너 중지 (있는 경우)
 if ${COMPOSE_CMD} ps -q 2>/dev/null | grep -q .; then
     info "기존 컨테이너를 중지합니다..."

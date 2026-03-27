@@ -180,15 +180,22 @@ def client() -> TestClient:
 
     ACIClient.__init__ 과 ACIClient.login 을 Mock 처리하여
     실제 APIC 접속 없이 테스트가 실행되도록 한다.
+
+    _config_ready 패치:
+    - CI 환경(config.yaml 없음)에서 SetupRedirectMiddleware가
+      모든 요청을 /setup으로 리다이렉트하는 것을 방지
+    - _try_init_aci()는 os.path.exists를 직접 사용하므로
+      conftest.py의 ACIClient 패치로 처리됨
     """
     with (
         patch("main.ACIClient") as mock_aci_class,
-        patch("main.os.path.exists", return_value=True),  # 추가
+        patch("main._config_ready", return_value=True),
     ):
         mock_aci_instance = MagicMock()
         mock_aci_class.return_value = mock_aci_instance
-        mock_aci_instance.get.return_value = []
+        mock_aci_instance.get.return_value = []  # Linter/Simulator Live Scan용 빈 배열
 
+        # 각 라우터 함수가 참조하는 데이터 반환값 설정
         with (
             patch("main.get_health_data", return_value=MOCK_HEALTH),
             patch("main.get_policy_data", return_value=MOCK_POLICY),
@@ -435,10 +442,6 @@ class TestLinterUploadAPI:
             files={"file": ("test.json", content, "application/json")},
         )
 
-    # ------------------------------------------
-    # 기본 응답 구조 검증
-    # ------------------------------------------
-
     def test_upload_returns_200(self, client):
         response = self._upload(client, {"imdata": []})
         assert response.status_code == 200
@@ -458,10 +461,6 @@ class TestLinterUploadAPI:
         data = self._upload(client, {"imdata": []}).json()
         assert data["total_issues"] == 0
 
-    # ------------------------------------------
-    # 오류 처리 검증
-    # ------------------------------------------
-
     def test_upload_non_json_file_returns_400(self, client):
         response = client.post(
             "/api/lint/upload",
@@ -475,10 +474,6 @@ class TestLinterUploadAPI:
             files={"file": ("test.json", b"{invalid json}", "application/json")},
         )
         assert response.status_code == 400
-
-    # ------------------------------------------
-    # SEC-001: permitAll 계열 Contract 탐지
-    # ------------------------------------------
 
     def test_sec_001_detects_risky_contract(self, client):
         payload = {
@@ -514,10 +509,6 @@ class TestLinterUploadAPI:
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "SEC-001" not in rule_ids
 
-    # ------------------------------------------
-    # SEC-002: Subject 없는 빈 Contract 탐지
-    # ------------------------------------------
-
     def test_sec_002_detects_empty_contract(self, client):
         payload = {
             "imdata": [
@@ -529,7 +520,6 @@ class TestLinterUploadAPI:
                         }
                     }
                 }
-                # vzSubj 없음 → SEC-002 발생
             ]
         }
         data = self._upload(client, payload).json()
@@ -558,10 +548,6 @@ class TestLinterUploadAPI:
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "SEC-002" not in rule_ids
 
-    # ------------------------------------------
-    # BP-001: EPG에 BD 미연결 탐지
-    # ------------------------------------------
-
     def test_bp_001_detects_epg_without_bd(self, client):
         payload = {
             "imdata": [
@@ -573,7 +559,6 @@ class TestLinterUploadAPI:
                         }
                     }
                 }
-                # fvRsBd 없음 → BP-001 발생
             ]
         }
         data = self._upload(client, payload).json()
@@ -605,10 +590,6 @@ class TestLinterUploadAPI:
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "BP-001" not in rule_ids
 
-    # ------------------------------------------
-    # NM-001: 이름에 공백/특수문자 탐지
-    # ------------------------------------------
-
     def test_nm_001_detects_invalid_characters(self, client):
         payload = {
             "imdata": [
@@ -639,10 +620,6 @@ class TestLinterUploadAPI:
         data = self._upload(client, payload).json()
         rule_ids = [r["rule_id"] for r in data["results"]]
         assert "NM-001" not in rule_ids
-
-    # ------------------------------------------
-    # severity 및 category 값 검증
-    # ------------------------------------------
 
     def test_result_severity_values_are_valid(self, client):
         payload = {
@@ -724,15 +701,6 @@ class TestSimulatorEpgsAPI:
 
 
 class TestSimulatorAPI:
-    """
-    시뮬레이션 판정 테스트.
-
-    DENY 케이스: ACIClient.get()이 빈 배열을 반환하므로
-                 Contract 없음 → ACI Whitelist 모델 기준 Deny-All 적용.
-    ALLOW 케이스: SimulatorEngine.simulate()를 직접 패치하여
-                  실제 APIC 데이터 없이 ALLOW 시나리오 검증.
-    """
-
     def _simulate(self, client: TestClient, src: str, dst: str):
         """시뮬레이션 요청 헬퍼"""
         return client.post(
@@ -740,17 +708,11 @@ class TestSimulatorAPI:
             json={"src_epg_dn": src, "dst_epg_dn": dst},
         )
 
-    # ------------------------------------------
-    # 기본 응답 구조 검증
-    # ------------------------------------------
-
     def test_simulate_returns_200(self, client: TestClient) -> None:
-        """유효한 요청에 200을 반환해야 한다."""
         response = self._simulate(client, SRC_EPG_DN, DST_EPG_DN)
         assert response.status_code == 200
 
     def test_simulate_response_keys(self, client: TestClient) -> None:
-        """응답에 필수 키가 모두 포함되어야 한다."""
         data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
         required = {
             "verdict",
@@ -764,35 +726,22 @@ class TestSimulatorAPI:
         assert required.issubset(data.keys())
 
     def test_simulate_verdict_is_valid_value(self, client: TestClient) -> None:
-        """verdict 값은 ALLOW 또는 DENY여야 한다."""
         data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
         assert data["verdict"] in ("ALLOW", "DENY")
 
-    # ------------------------------------------
-    # DENY 판정 검증 (빈 ACIClient 응답 기반)
-    # ------------------------------------------
-
     def test_simulate_deny_when_no_contracts(self, client: TestClient) -> None:
-        """Contract 없으면 DENY를 반환해야 한다 (ACI Whitelist 모델 기본값)."""
         data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
         assert data["verdict"] == "DENY"
 
     def test_simulate_deny_has_empty_contracts(self, client: TestClient) -> None:
-        """DENY 판정 시 matched_contracts는 빈 리스트여야 한다."""
         data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
         assert data["matched_contracts"] == []
 
     def test_simulate_deny_has_reason(self, client: TestClient) -> None:
-        """DENY 판정 시 reason 필드가 비어있지 않아야 한다."""
         data = self._simulate(client, SRC_EPG_DN, DST_EPG_DN).json()
         assert len(data["reason"]) > 0
 
-    # ------------------------------------------
-    # ALLOW 판정 검증 (SimulatorEngine.simulate 패치)
-    # ------------------------------------------
-
     def test_simulate_allow_verdict(self, client: TestClient) -> None:
-        """Contract가 존재하면 ALLOW를 반환해야 한다."""
         with patch(
             "services.simulator_engine.SimulatorEngine.simulate",
             return_value=MOCK_SIMULATE_ALLOW,
@@ -801,7 +750,6 @@ class TestSimulatorAPI:
         assert data["verdict"] == "ALLOW"
 
     def test_simulate_allow_contains_contract(self, client: TestClient) -> None:
-        """ALLOW 판정 시 matched_contracts에 Contract 정보가 포함되어야 한다."""
         with patch(
             "services.simulator_engine.SimulatorEngine.simulate",
             return_value=MOCK_SIMULATE_ALLOW,
@@ -811,7 +759,6 @@ class TestSimulatorAPI:
         assert data["matched_contracts"][0]["name"] == "web-to-db"
 
     def test_simulate_allow_contract_has_subjects(self, client: TestClient) -> None:
-        """ALLOW 판정 Contract에 Subject 및 Filter 정보가 포함되어야 한다."""
         with patch(
             "services.simulator_engine.SimulatorEngine.simulate",
             return_value=MOCK_SIMULATE_ALLOW,
@@ -821,17 +768,11 @@ class TestSimulatorAPI:
         assert len(contract["subjects"]) > 0
         assert len(contract["subjects"][0]["filters"]) > 0
 
-    # ------------------------------------------
-    # 유효성 검증 (400 / 422)
-    # ------------------------------------------
-
     def test_simulate_same_epg_returns_400(self, client: TestClient) -> None:
-        """Source와 Destination EPG가 동일하면 400을 반환해야 한다."""
         response = self._simulate(client, SRC_EPG_DN, SRC_EPG_DN)
         assert response.status_code == 400
 
     def test_simulate_missing_src_returns_422(self, client: TestClient) -> None:
-        """src_epg_dn 누락 시 422를 반환해야 한다."""
         response = client.post(
             "/api/simulate",
             json={"dst_epg_dn": DST_EPG_DN},
@@ -839,7 +780,6 @@ class TestSimulatorAPI:
         assert response.status_code == 422
 
     def test_simulate_missing_dst_returns_422(self, client: TestClient) -> None:
-        """dst_epg_dn 누락 시 422를 반환해야 한다."""
         response = client.post(
             "/api/simulate",
             json={"src_epg_dn": SRC_EPG_DN},
@@ -847,18 +787,14 @@ class TestSimulatorAPI:
         assert response.status_code == 422
 
 
+# ============================================
+# TestACIClientFailover
+# ============================================
+
+
 class TestACIClientFailover:
-    """
-    ACIClient Failover / 에러핸들링 단위 테스트 (v1.5.0)
+    """ACIClient Failover / 에러핸들링 단위 테스트 (v1.5.0)"""
 
-    - conftest.py가 ACIClient를 모듈 레벨에서 patch하므로,
-      패치 전에 저장한 _RealACIClient로 실제 인스턴스를 생성
-    - _load_config patch: config.yaml 파일 없이 config dict 직접 주입
-    - Session.post patch: login() Failover 시나리오 제어
-    - Session.get patch:  get() 세션 만료(401) 시나리오 제어
-    """
-
-    # 테스트용 config — hosts 3개 (Primary + Failover 2개)
     MOCK_CONFIG = {
         "apic": {
             "hosts": [
@@ -875,13 +811,6 @@ class TestACIClientFailover:
     }
 
     def _make_client(self):
-        """
-        실제 ACIClient 인스턴스 생성 헬퍼
-
-        conftest.py가 ACIClient를 모듈 레벨에서 patch하므로,
-        패치 전에 저장한 _RealACIClient를 사용해 실제 인스턴스를 생성한다.
-        _load_config를 patch해서 MOCK_CONFIG를 직접 주입한다.
-        """
         import conftest as cf
 
         with patch.object(
@@ -892,16 +821,7 @@ class TestACIClientFailover:
             return cf._RealACIClient("dummy.yaml")
 
     def test_failover_on_first_host_down(self):
-        """
-        Primary APIC 연결 실패 시 Secondary로 자동 전환 검증
-
-        시나리오:
-          hosts[0] (apic1) → ConnectionError (Down)
-          hosts[1] (apic2) → HTTP 200 (Up)
-          기대: self.apic == "https://apic2.test"
-        """
         client = self._make_client()
-
         ok_response = MagicMock()
         ok_response.ok = True
 
@@ -920,13 +840,6 @@ class TestACIClientFailover:
         assert client.logged_in is True
 
     def test_all_hosts_down_returns_empty(self):
-        """
-        모든 APIC host 연결 실패 시 get() 빈 배열 반환 검증
-
-        시나리오:
-          hosts[0,1,2] 전부 → ConnectionError
-          기대: login() == False, get() == []
-        """
         client = self._make_client()
 
         with patch.object(
@@ -942,15 +855,6 @@ class TestACIClientFailover:
         mock_get.assert_not_called()
 
     def test_session_expired_relogin(self):
-        """
-        APIC 세션 만료(401) 시 자동 재로그인 후 재시도 검증
-
-        시나리오:
-          get() 1회차 → HTTP 401 (세션 만료)
-          login() 재시도 → 성공
-          get() 2회차 → HTTP 200, imdata 정상 반환
-          기대: 결과 == 정상 데이터
-        """
         client = self._make_client()
         client.logged_in = True
 
@@ -984,7 +888,124 @@ class TestACIClientFailover:
 # ============================================
 
 
+class TestSetupTestAPI:
+    """APIC 연결 테스트 API 검증"""
+
+    ENDPOINT = "/api/setup/test"
+    VALID_PAYLOAD = {
+        "hosts": ["https://192.168.1.1"],
+        "username": "admin",
+        "password": "testpass",
+        "timeout": 30,
+        "retry": 3,
+    }
+
+    def test_test_connection_success(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+
+        with patch("routers.setup.requests.Session") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["connected_host"] != ""
+
+    def test_test_connection_auth_failure(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+
+        with patch("routers.setup.requests.Session") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    def test_test_connection_timeout(self, client):
+        with patch("routers.setup.requests.Session") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.post.side_effect = requests.exceptions.Timeout()
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    def test_test_connection_unreachable(self, client):
+        with patch("routers.setup.requests.Session") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.post.side_effect = requests.exceptions.ConnectionError()
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    def test_test_connection_empty_hosts(self, client):
+        payload = {**self.VALID_PAYLOAD, "hosts": []}
+        resp = client.post(self.ENDPOINT, json=payload)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+
+    def test_test_connection_host_without_scheme(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        payload = {**self.VALID_PAYLOAD, "hosts": ["192.168.1.1"]}
+
+        with patch("routers.setup.requests.Session") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=payload)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["connected_host"].startswith("https://")
+
+    def test_test_connection_failover(self, client):
+        mock_ok = MagicMock()
+        mock_ok.ok = True
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise requests.exceptions.ConnectionError()
+            return mock_ok
+
+        payload = {
+            **self.VALID_PAYLOAD,
+            "hosts": ["https://192.168.1.1", "https://192.168.1.2"],
+        }
+
+        with patch("routers.setup.requests.Session") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.post.side_effect = side_effect
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=payload)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+
+# ============================================
+# TestSetupSaveAPI — POST /api/setup/save
+# ============================================
+
+
 class TestSetupSaveAPI:
+    """설정 저장 API 검증"""
+
     ENDPOINT = "/api/setup/save"
     VALID_PAYLOAD = {
         "hosts": ["https://192.168.1.1"],
@@ -1071,3 +1092,35 @@ class TestSetupSaveAPI:
         assert resp.status_code == 200
         assert resp.json()["success"] is False
         assert "저장 실패" in resp.json()["message"]
+
+
+# ============================================
+# TestSetupMiddleware — Middleware 동작 검증
+# ============================================
+
+
+class TestSetupMiddleware:
+    """SetupRedirectMiddleware 동작 테스트"""
+
+    def test_redirect_when_no_config(self, client):
+        """config.yaml 없으면 / 접속 시 /setup으로 리다이렉트"""
+        with patch("main._config_ready", return_value=False):
+            resp = client.get("/", follow_redirects=False)
+
+        assert resp.status_code in (302, 307)
+        assert "/setup" in resp.headers.get("location", "")
+
+    def test_setup_page_always_accessible(self, client):
+        """config.yaml 없어도 /setup은 Middleware를 통과해야 한다"""
+        from starlette.responses import Response
+
+        with (
+            patch("main._config_ready", return_value=False),
+            patch(
+                "main.FileResponse",
+                return_value=Response(content="ok", status_code=200),
+            ),
+        ):
+            resp = client.get("/setup", follow_redirects=False)
+
+        assert resp.status_code not in (302, 307)
