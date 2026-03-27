@@ -31,6 +31,14 @@ pip install -r requirements.txt
 pip install -r requirements_dev.txt
 ```
 
+Ubuntu 서버 환경 (회사 SSL 프록시 대응)
+```
+pip3 install -r requirements_dev.txt --break-system-packages \
+    --trusted-host pypi.org \
+    --trusted-host pypi.python.org \
+    --trusted-host files.pythonhosted.org
+```
+
 ## 설정
 
 ```
@@ -73,7 +81,7 @@ copy backend\config.yaml.example backend\config.yaml
 copy .env.example .env
 
 # 컨테이너 실행
-docker compose up
+docker compose up --build -d
 ```
 
 ## API 엔드포인트
@@ -93,7 +101,7 @@ docker compose up
 | GET /api/simulate/tenants | Tenant 목록 조회 (드롭다운용) |
 | GET /api/simulate/epgs?tenant= | EPG 목록 조회 (드롭다운용) |
 | POST /api/simulate | 트래픽 허용/차단 판정 |
-| GET /api/all | 전체 데이터 병렬 조회 (v1.5.0) |
+| GET /api/all | 전체 데이터 병렬 조회 |
 
 ## Config Linter
 
@@ -143,7 +151,7 @@ aci-ops-webui/
 │   ├── config.yaml              # APIC 설정 (gitignore)
 │   ├── config.yaml.example      # APIC 설정 템플릿
 │   ├── services/
-│   │   ├── aci_client.py        # ACI API 클라이언트 (Failover 지원)
+│   │   ├── aci_client.py        # ACI API 클라이언트 (Failover, Lock 지원)
 │   │   ├── linter_engine.py     # Config Linter 규칙 엔진
 │   │   └── simulator_engine.py  # Microsegmentation Simulator 엔진
 │   └── routers/
@@ -157,7 +165,21 @@ aci-ops-webui/
 │       ├── linter.py            # Config Linter API
 │       └── simulator.py         # Microsegmentation Simulator API
 ├── frontend/
-│   └── index.html               # 대시보드 UI (시멘틱 HTML)
+│   ├── index.html               # 대시보드 HTML 뼈대 (v1.7.0)
+│   ├── css/
+│   │   └── style.css            # 전체 CSS
+│   └── js/
+│       ├── common.js            # STATE, 네비게이션, apiFetch, 유틸리티
+│       ├── dashboard.js
+│       ├── health.js
+│       ├── policy.js
+│       ├── interface.js
+│       ├── endpoint.js
+│       ├── audit.js
+│       ├── capacity.js
+│       ├── topology.js
+│       ├── linter.js
+│       └── simulator.js
 └── tests/
     ├── conftest.py              # pytest 패치 설정
     └── test_api.py              # API 단위 테스트 (61 passed, 1 skipped)
@@ -169,7 +191,16 @@ aci-ops-webui/
 pytest tests/ -v
 ```
 
-v1.5.0 기준: 61 passed, 1 skipped
+v1.7.0 기준: 61 passed, 1 skipped
+
+Ubuntu 서버에서 pytest PATH 미인식 시:
+```
+# PATH 추가 (최초 1회)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+pytest tests/ -v
+```
 
 ## 환경
 

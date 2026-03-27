@@ -1,6 +1,52 @@
 # Changelog
 
+## [1.7.0] - 2026-03-27
+
+### Added
+- 프론트엔드 CSS/JS 파일 분리
+  - `frontend/css/style.css` — 전체 CSS 추출
+  - `frontend/js/common.js` — STATE, 네비게이션, apiFetch, 공통 유틸리티
+  - `frontend/js/dashboard.js` — Dashboard 섹션
+  - `frontend/js/health.js` — Health Check 섹션
+  - `frontend/js/policy.js` — Policy Check 섹션
+  - `frontend/js/interface.js` — Interface Monitor 섹션
+  - `frontend/js/endpoint.js` — Endpoint Tracker 섹션
+  - `frontend/js/audit.js` — Audit Log 섹션
+  - `frontend/js/capacity.js` — Capacity Report 섹션
+  - `frontend/js/topology.js` — Topology Viewer 섹션
+  - `frontend/js/linter.js` — Config Linter 섹션
+  - `frontend/js/simulator.js` — Microseg Simulator 섹션
+
+### Fixed
+- `ACIClient.login()` Race Condition 수정 (`threading.Lock` 적용)
+  - `/api/all` 병렬 호출 시 세션 만료(401)를 여러 스레드가 동시에 감지하면
+    `login()`이 중복 실행되어 데이터가 빈 배열로 반환되는 문제 해결
+  - Double-Checked Locking 패턴으로 불필요한 재로그인 방지
+
+### Changed
+- `frontend/index.html` — HTML 뼈대만 유지 (버전 표기 v1.7.0)
+- `frontend/legacy/` 폴더 제거 (Git 히스토리로 버전 관리)
+
+### Test
+- 61 passed, 1 skipped (v1.6.0과 동일)
+
+## [1.6.0] - 2026-03-26
+
+### Added
+- 사이드바 네비게이션 SPA (단일 index.html)
+- Dashboard 기본 진입점 (6개 Stat Card + Module Status Grid + Recent Changes)
+- 모듈별 독립 섹션 및 전용 API 호출
+- 사이드바 배지 (Health Critical+Major / Policy Risk / Capacity High TCAM)
+- 툴팁 4개 (Health / Config Linter / Microseg Simulator / Capacity)
+- Auto-refresh 현재 섹션만 30초 갱신 (Linter 제외)
+- Dockerfile `--trusted-host` 옵션 추가 (회사 SSL 프록시 대응)
+
+### Changed
+- 라이트 테마 단일 고정 (다크모드 제거)
+- 전체 폰트 사이즈 상향 (body 15px 기준)
+
 ## [1.5.0] - 2026-03-26
+
 ### Added
 - APIC Failover: config.yaml `hosts` 리스트 구조 도입
   - Primary APIC 연결 실패 시 다음 host로 자동 전환
@@ -30,6 +76,7 @@
 - 61 passed, 1 skipped (v1.4.0 대비 +3)
 
 ## [1.4.0] - 2026-03-26
+
 ### Added
 - Microsegmentation Simulator 기능 추가
   - GET /api/simulate/tenants: Tenant 목록 조회 (드롭다운용, 시스템 Tenant 제외)
@@ -39,20 +86,17 @@
   - EpgInfo, ContractInfo, SubjectInfo, FilterEntry, SimulationResult 데이터 클래스
   - Consumer/Provider Contract 교집합 탐색 → ALLOW / DENY 판정
 - backend/routers/simulator.py: 시뮬레이터 API 엔드포인트 (팩토리 패턴 get_simulate_router)
-- frontend/index.html: Microsegmentation Simulator 섹션 UI 추가
-  - Source / Destination EPG 2단계 드롭다운 (Tenant → EPG)
-  - ALLOW / DENY 판정 배지 + 판정 근거 텍스트
-  - SVG 경로 다이어그램 (ALLOW: Contract 박스 연결선, DENY: 점선 + X 마크)
-  - Matched Contract / Subject / Filter 상세 테이블
-  - 다크모드 대응
 - tests/test_api.py: 시뮬레이터 테스트 18개 추가
   - TestSimulatorTenantsAPI (2개), TestSimulatorEpgsAPI (3개), TestSimulatorAPI (13개)
-  - 전체 테스트: 58 passed, 1 skipped
 
 ### Changed
 - backend/main.py: 버전 v1.4.0으로 업데이트, 시뮬레이터 라우터 등록
 
+### Test
+- 58 passed, 1 skipped (v1.3.0 대비 +18)
+
 ## [1.3.0] - 2026-03-25
+
 ### Added
 - Config Linter / Validator 기능 추가
   - GET /api/lint: APIC Live 조회 기반 실시간 분석
@@ -70,27 +114,21 @@
   - NM-002: config.yaml 정의 Prefix 규칙 위반 탐지 (선택 적용)
 - config.yaml.example: linter.naming 섹션 추가
 - tests/test_api.py: Linter 테스트 21개 추가 (TestLinterAPI 5개, TestLinterUploadAPI 16개)
-- frontend/index.html: Config Linter 섹션 UI 추가 (Live Scan / Upload JSON 버튼, 결과 테이블)
-
-### Changed
-- frontend/index.html: 시멘틱 HTML 구조 전면 개편
-  - div → header, main, footer, section, article 태그 적용
-  - aria-label, aria-live, aria-hidden, role 접근성 속성 추가
-  - 모달 title h5 → h2.h5 (문서 계층 구조 준수)
-- backend/services/aci_client.py: get() 반환 시 class_name 키 없는 항목 필터링
-  - APIC 세션 만료/인증 실패 시 error 오브젝트로 인한 KeyError 방지
-- main.py: 버전 주석 v1.3.0으로 업데이트
 
 ### Fixed
 - APIC 로그인 실패 또는 세션 만료 시 /api/all 500 에러 (KeyError: 'faultInst')
 
+### Test
+- 41 passed, 1 skipped (v1.2.1 대비 +21)
+
 ## [1.2.1] - 2026-03-25
+
 ### Added
 - GitHub Actions CI/CD 파이프라인 (.github/workflows/ci.yml)
   - flake8, black, pytest 자동 실행
   - 트리거: main 브랜치 push, 모든 pull_request
 - Dockerfile (python:3.12-slim 기반 컨테이너 이미지)
-- docker_compose.yml (로컬 개발 환경 오케스트레이션)
+- docker-compose.yml (로컬 개발 환경 오케스트레이션)
 - .env.example (Docker 환경변수 템플릿)
 - .flake8 (flake8 코드 스타일 설정, max-line-length 120)
 - requirements_dev.txt (개발/테스트 의존성 분리)
@@ -105,6 +143,7 @@
 - black 포맷 적용 (11개 파일)
 
 ## [1.2.0] - 2026-03-24
+
 ### Added
 - tests/test_api.py: pytest 기반 API 엔드포인트 단위 테스트 (ACIClient Mock 처리)
 - tests/conftest.py: pytest 사전 패치 설정 (config.yaml, StaticFiles 없이 실행)
@@ -113,6 +152,7 @@
 - README.md: 대시보드 스크린샷 추가
 
 ## [1.1.0] - 2026-02-04
+
 ### Added
 - 자동 새로고침 기능 (30초)
 - Endpoint 검색 API (/api/endpoint/search)
@@ -128,6 +168,7 @@
 - 토폴로지 시각화 개선
 
 ## [1.0.0] - 2026-02-04
+
 ### Added
 - FastAPI 백엔드 (7개 API)
 - Bootstrap 대시보드 UI

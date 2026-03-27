@@ -1,10 +1,11 @@
 # ============================================
 # ACI API Client
 # 목적: ACI APIC 연결 및 API 호출 공통 모듈
-# 버전: v1.5.0 - APIC Failover, timeout/retry 설정화, 세션 재로그인
+# 버전: v1.7.0 - login() Race Condition 수정 (threading.Lock)
 # ============================================
 
 import logging
+import threading
 from typing import List
 
 import requests
@@ -24,6 +25,12 @@ class ACIClient:
     - REST API 호출 공통 메서드 제공
     - timeout / retry 횟수 config.yaml에서 설정
     - 모든 모듈에서 공유하여 사용
+
+    v1.7.0 변경사항:
+    - _login_lock (threading.Lock) 추가
+    - /api/all 병렬 호출 시 세션 만료 Race Condition 해결
+      → 첫 번째 스레드가 login() 완료 후 나머지 스레드는
+        logged_in=True 확인 후 즉시 통과
     """
 
     def __init__(self, config_path: str = "config.yaml") -> None:
@@ -56,6 +63,14 @@ class ACIClient:
         # 로그인 상태 플래그
         self.logged_in: bool = False
 
+        # ============================================
+        # v1.7.0: login() 직렬화 Lock
+        # /api/all의 ThreadPoolExecutor 병렬 호출 시
+        # 세션 만료(401)를 여러 스레드가 동시에 감지해도
+        # login()은 반드시 1개 스레드만 실행되도록 보장
+        # ============================================
+        self._login_lock = threading.Lock()
+
     def _load_config(self, config_path: str) -> dict:
         """
         설정 파일 로드 (Private 메서드)
@@ -70,62 +85,74 @@ class ACIClient:
 
     def login(self) -> bool:
         """
-        APIC 로그인 (Failover 포함)
+        APIC 로그인 (Failover 포함, Lock으로 직렬화)
+
+        v1.7.0: _login_lock으로 동시 호출을 직렬화합니다.
+        Lock 대기 후 진입 시 이미 logged_in=True이면
+        다른 스레드가 로그인을 완료한 것이므로 즉시 True 반환합니다.
 
         hosts 리스트를 순서대로 시도합니다.
         Primary 연결 실패 시 다음 host로 자동 전환합니다.
 
-        - aaaUser: ACI 인증 클래스 (고정값)
-        - aaaLogin.json: 로그인 엔드포인트 (고정값)
-        - 로그인 성공 시 세션에 토큰 자동 저장됨
-
         Returns:
             bool: 로그인 성공 여부 (전체 host 실패 시 False)
         """
-        # ACI 인증 요청 본문 구성
-        auth = {
-            "aaaUser": {
-                "attributes": {
-                    "name": self.config["apic"]["username"],
-                    "pwd": self.config["apic"]["password"],
+        with self._login_lock:
+            # ============================================
+            # Lock 획득 후 재확인 (Double-Checked Locking)
+            # 대기 중 다른 스레드가 이미 로그인 완료했으면 통과
+            # ============================================
+            if self.logged_in:
+                return True
+
+            # ACI 인증 요청 본문 구성
+            auth = {
+                "aaaUser": {
+                    "attributes": {
+                        "name": self.config["apic"]["username"],
+                        "pwd": self.config["apic"]["password"],
+                    }
                 }
             }
-        }
 
-        # ============================================
-        # hosts 리스트 순서대로 Failover 시도
-        # Static Route next-hop 순차 시도와 동일한 개념
-        # ============================================
-        for host in self.hosts:
-            try:
-                logger.info("APIC 로그인 시도: %s", host)
+            # ============================================
+            # hosts 리스트 순서대로 Failover 시도
+            # Static Route next-hop 순차 시도와 동일한 개념
+            # ============================================
+            for host in self.hosts:
+                try:
+                    logger.info("APIC 로그인 시도: %s", host)
 
-                resp = self.session.post(
-                    f"{host}/api/aaaLogin.json",
-                    json=auth,
-                    verify=False,
-                    timeout=self.timeout,
-                )
+                    resp = self.session.post(
+                        f"{host}/api/aaaLogin.json",
+                        json=auth,
+                        verify=False,
+                        timeout=self.timeout,
+                    )
 
-                if resp.ok:
-                    # 로그인 성공 → 현재 APIC 주소 갱신
-                    self.apic = host
-                    self.logged_in = True
-                    logger.info("APIC 로그인 성공: %s", host)
-                    return True
+                    if resp.ok:
+                        # 로그인 성공 → 현재 APIC 주소 갱신
+                        self.apic = host
+                        self.logged_in = True
+                        logger.info("APIC 로그인 성공: %s", host)
+                        return True
 
-                logger.warning("APIC 로그인 실패 (HTTP %s): %s", resp.status_code, host)
+                    logger.warning(
+                        "APIC 로그인 실패 (HTTP %s): %s", resp.status_code, host
+                    )
 
-            except requests.exceptions.Timeout:
-                logger.warning("APIC 연결 타임아웃 (%ds): %s", self.timeout, host)
+                except requests.exceptions.Timeout:
+                    logger.warning(
+                        "APIC 연결 타임아웃 (%ds): %s", self.timeout, host
+                    )
 
-            except requests.exceptions.ConnectionError:
-                logger.warning("APIC 연결 오류 (ConnectionError): %s", host)
+                except requests.exceptions.ConnectionError:
+                    logger.warning("APIC 연결 오류 (ConnectionError): %s", host)
 
-        # 모든 host 실패
-        self.logged_in = False
-        logger.error("모든 APIC host 로그인 실패: %s", self.hosts)
-        return False
+            # 모든 host 실패
+            self.logged_in = False
+            logger.error("모든 APIC host 로그인 실패: %s", self.hosts)
+            return False
 
     def _get_once(self, class_name: str, query: str = "") -> list:
         """
