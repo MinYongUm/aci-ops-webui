@@ -116,6 +116,7 @@ docker compose up --build -d
 | GET /api/simulate/epgs?tenant= | EPG 목록 조회 (드롭다운용) |
 | POST /api/simulate | 트래픽 허용/차단 판정 |
 | GET /api/all | 전체 데이터 병렬 조회 |
+| GET /api/setup/config | 현재 APIC 설정 조회 (password 마스킹) |
 
 ## Config Linter
 

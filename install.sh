@@ -2,7 +2,7 @@
 # ============================================
 # ACI Ops WebUI — install.sh
 # 목적: Ubuntu 환경에서 원스텝 설치 및 업데이트
-# 버전: v1.9.0
+# 버전: v1.9.1
 #
 # 사용법:
 #   curl -fsSL https://raw.githubusercontent.com/MinYongUm/aci-ops-webui/main/install.sh | bash

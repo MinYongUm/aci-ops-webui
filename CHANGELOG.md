@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.9.1] - 2026-03-27
+### Added
+- GET /api/setup/config: 현재 APIC 설정 조회 API (password 마스킹)
+- frontend/js/settings.js: Settings 섹션 신규 (APIC Hosts/Username/Password 수정 + Test Connection)
+- 사이드바 System 그룹 + Settings nav-item 추가
+- 섹션 헤더 우측 상단 설정 아이콘 버튼 추가
+- tests/test_api.py: TestSetupConfigAPI (7개 테스트 추가)
+
+### Fixed
+- install.sh: config.yaml 빈 파일일 때 /setup 대신 / 로 안내하는 버그 수정 (stat -c%s)
+
+### Changed
+- install.sh: Docker 자동시작 설정 추가 (sudo systemctl enable docker)
+- common.js: Settings 섹션 자동 새로고침 제외
+- 버전 표기 v1.9.0 → v1.9.1
+
 ## [1.9.0] - 2026-03-27
 ### Added
 - 초기 설정 UI (`/setup` 페이지) — config.yaml 미존재 시 자동 리다이렉트
