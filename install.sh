@@ -50,9 +50,9 @@ divider
 echo ""
 
 # ============================================
-# Step 1. curl 설치 확인
+# Step 1. 필수 도구 확인 (curl, unzip)
 # ============================================
-step "Step 1. curl 확인"
+step "Step 1. 필수 도구 확인"
 
 if ! command -v curl &>/dev/null; then
     warn "curl이 없습니다. 설치를 시도합니다..."
@@ -60,6 +60,14 @@ if ! command -v curl &>/dev/null; then
     success "curl 설치 완료"
 else
     success "curl 확인 완료 ($(curl --version | head -1))"
+fi
+
+if ! command -v unzip &>/dev/null; then
+    warn "unzip이 없습니다. 설치를 시도합니다..."
+    sudo apt-get update -qq && sudo apt-get install -y unzip
+    success "unzip 설치 완료"
+else
+    success "unzip 확인 완료"
 fi
 
 # ============================================
@@ -150,16 +158,13 @@ if [[ -d "${INSTALL_DIR}" ]]; then
     if [[ -n "${CURRENT_TAG}" && "${CURRENT_TAG}" == "${LATEST_TAG}" ]]; then
         success "이미 최신 버전(${LATEST_TAG})이 설치되어 있습니다."
         info "서비스 상태를 확인하고 재시작합니다..."
-        UPDATE_ONLY=true
     else
         if [[ -n "${CURRENT_TAG}" ]]; then
             info "업데이트: ${CURRENT_TAG} → ${LATEST_TAG}"
         fi
-        UPDATE_ONLY=false
     fi
 else
     info "신규 설치: ${INSTALL_DIR}"
-    UPDATE_ONLY=false
 fi
 
 # ============================================
@@ -169,7 +174,6 @@ step "Step 4. 소스 다운로드 (${LATEST_TAG})"
 
 WORK_DIR=$(mktemp -d)
 ZIP_PATH="${WORK_DIR}/${REPO_NAME}-${LATEST_TAG}.zip"
-EXTRACT_DIR="${WORK_DIR}/${REPO_NAME}-${LATEST_TAG#v}"
 
 info "다운로드 중: ${LATEST_TAG}.zip"
 curl -fsSL \
