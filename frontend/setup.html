@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACI Ops — Initial Setup</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+    <style>
+        /* ============================================
+           Cisco DevNet 다크 테마 (v1.8.0 동일)
+           style.css 없이 독립 동작하도록 인라인 정의
+           ============================================ */
+        :root {
+            --bg-body:          #0d1421;
+            --bg-card:          #1b2a3b;
+            --bg-header:        #111e30;
+            --border-color:     #1e3a5f;
+            --text-main:        #e4e8ed;
+            --text-muted:       #8fa3b8;
+            --cisco-blue:       #049fd4;
+            --cisco-blue-hover: #00bceb;
+            --color-success:    #22c55e;
+            --color-danger:     #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 16px;
+        }
+
+        /* ============================================
+           설정 카드
+           ============================================ */
+        .setup-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 560px;
+            overflow: hidden;
+        }
+
+        .setup-header {
+            background: var(--bg-header);
+            border-bottom: 1px solid var(--border-color);
+            padding: 28px 32px;
+            text-align: center;
+        }
+
+        .setup-header .brand-icon {
+            font-size: 2rem;
+            color: var(--cisco-blue);
+            margin-bottom: 8px;
+        }
+
+        .setup-header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0 0 4px;
+        }
+
+        .setup-header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        .setup-body {
+            padding: 32px;
+        }
+
+        /* ============================================
+           폼 스타일
+           ============================================ */
+        .form-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            padding: 10px 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            background: var(--bg-body);
+            border-color: var(--cisco-blue);
+            color: var(--text-main);
+            box-shadow: 0 0 0 2px rgba(4, 159, 212, 0.2);
+        }
+
+        .form-control::placeholder {
+            color: #4a6080;
+        }
+
+        .input-group-text {
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
+        /* ============================================
+           APIC 호스트 입력 (동적 추가)
+           ============================================ */
+        .host-entry {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .host-entry input {
+            flex: 1;
+        }
+
+        .btn-remove-host {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            border-radius: 8px;
+            width: 36px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .btn-remove-host:hover {
+            border-color: var(--color-danger);
+            color: var(--color-danger);
+        }
+
+        .btn-add-host {
+            background: transparent;
+            border: 1px dashed var(--border-color);
+            color: var(--text-muted);
+            border-radius: 8px;
+            width: 100%;
+            padding: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+
+        .btn-add-host:hover {
+            border-color: var(--cisco-blue);
+            color: var(--cisco-blue);
+        }
+
+        .host-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* ============================================
+           버튼
+           ============================================ */
+        .btn-cisco {
+            background: var(--cisco-blue);
+            border: none;
+            color: #ffffff;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 10px 20px;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn-cisco:hover:not(:disabled) {
+            background: var(--cisco-blue-hover);
+            color: #ffffff;
+        }
+
+        .btn-cisco:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-outline-cisco {
+            background: transparent;
+            border: 1px solid var(--cisco-blue);
+            color: var(--cisco-blue);
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 10px 20px;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-outline-cisco:hover:not(:disabled) {
+            background: var(--cisco-blue);
+            color: #ffffff;
+        }
+
+        .btn-outline-cisco:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ============================================
+           상태 메시지
+           ============================================ */
+        .status-box {
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .status-box.show {
+            display: flex;
+        }
+
+        .status-box.success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: var(--color-success);
+        }
+
+        .status-box.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--color-danger);
+        }
+
+        .status-box.loading {
+            background: rgba(4, 159, 212, 0.1);
+            border: 1px solid rgba(4, 159, 212, 0.3);
+            color: var(--cisco-blue);
+        }
+
+        /* ============================================
+           구분선
+           ============================================ */
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 24px 0;
+        }
+
+        /* ============================================
+           스피너 (작은 인라인 버전)
+           ============================================ */
+        .spinner-sm {
+            width: 14px;
+            height: 14px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="setup-card">
+
+        <!-- 헤더 -->
+        <div class="setup-header">
+            <div class="brand-icon">
+                <i class="bi bi-diagram-3-fill"></i>
+            </div>
+            <h1>ACI Ops Dashboard</h1>
+            <p>APIC 접속 정보를 입력하여 초기 설정을 완료하세요.</p>
+        </div>
+
+        <!-- 바디 -->
+        <div class="setup-body">
+
+            <!-- APIC 호스트 입력 -->
+            <div class="mb-4">
+                <label class="form-label">APIC Hosts</label>
+
+                <div id="host-list">
+                    <!-- 동적으로 추가됨 -->
+                </div>
+
+                <button class="btn-add-host" onclick="addHost()">
+                    <i class="bi bi-plus me-1"></i>호스트 추가 (클러스터 구성 시)
+                </button>
+
+                <div class="host-hint">
+                    <i class="bi bi-info-circle me-1"></i>
+                    APIC 단독 구성: 1개 / 클러스터(3대): 3개 입력.
+                    https:// 생략 가능.
+                </div>
+            </div>
+
+            <!-- 계정 정보 -->
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-person"></i>
+                    </span>
+                    <input type="text" class="form-control" id="username"
+                           placeholder="admin" autocomplete="username">
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-lock"></i>
+                    </span>
+                    <input type="password" class="form-control" id="password"
+                           placeholder="APIC 비밀번호" autocomplete="current-password">
+                    <button class="input-group-text" onclick="togglePassword()" style="cursor:pointer;">
+                        <i class="bi bi-eye" id="eye-icon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <!-- 상태 메시지 -->
+            <div class="status-box" id="status-box">
+                <span id="status-icon"></span>
+                <span id="status-message"></span>
+            </div>
+
+            <!-- 버튼 영역 -->
+            <div class="d-flex flex-column gap-3">
+                <button class="btn-outline-cisco" id="btn-test" onclick="testConnection()">
+                    <i class="bi bi-plug me-2"></i>Test Connection
+                </button>
+
+                <button class="btn-cisco" id="btn-save" onclick="saveConfig()" disabled>
+                    <i class="bi bi-check-circle me-2"></i>Save &amp; Go to Dashboard
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // ============================================
+        // 전역 상태
+        // ============================================
+        var testPassed = false;   // Test Connection 통과 여부
+
+        // ============================================
+        // 초기화
+        // ============================================
+        window.onload = function () {
+            addHost();   // 첫 번째 호스트 입력 필드 생성
+        };
+
+        // ============================================
+        // 호스트 입력 필드 동적 관리
+        // ============================================
+        function addHost() {
+            var list = document.getElementById('host-list');
+            var count = list.children.length;
+
+            var entry = document.createElement('div');
+            entry.className = 'host-entry';
+            entry.innerHTML =
+                '<input type="text" class="form-control host-input"' +
+                '       placeholder="192.168.1.1 또는 https://apic.example.com"' +
+                '       oninput="onInputChange()">' +
+                '<button class="btn-remove-host" onclick="removeHost(this)" title="삭제">' +
+                '    <i class="bi bi-x"></i>' +
+                '</button>';
+
+            list.appendChild(entry);
+            updateRemoveButtons();
+
+            // 추가된 필드에 포커스
+            entry.querySelector('input').focus();
+
+            // 입력 변경 시 테스트 결과 초기화
+            onInputChange();
+        }
+
+        function removeHost(btn) {
+            var list = document.getElementById('host-list');
+            if (list.children.length <= 1) return;  // 최소 1개 유지
+            btn.closest('.host-entry').remove();
+            updateRemoveButtons();
+            onInputChange();
+        }
+
+        function updateRemoveButtons() {
+            var list = document.getElementById('host-list');
+            var btns = list.querySelectorAll('.btn-remove-host');
+            // 호스트가 1개면 삭제 버튼 비활성화
+            btns.forEach(function (btn) {
+                btn.disabled = btns.length <= 1;
+                btn.style.opacity = btns.length <= 1 ? '0.3' : '1';
+            });
+        }
+
+        // ============================================
+        // 입력값 수집
+        // ============================================
+        function getHosts() {
+            var inputs = document.querySelectorAll('.host-input');
+            var hosts = [];
+            inputs.forEach(function (input) {
+                var val = input.value.trim();
+                if (val) hosts.push(val);
+            });
+            return hosts;
+        }
+
+        function getFormData() {
+            return {
+                hosts: getHosts(),
+                username: document.getElementById('username').value.trim(),
+                password: document.getElementById('password').value,
+                timeout: 30,
+                retry: 3
+            };
+        }
+
+        // ============================================
+        // 입력 변경 감지 (테스트 결과 초기화)
+        // ============================================
+        function onInputChange() {
+            if (testPassed) {
+                testPassed = false;
+                document.getElementById('btn-save').disabled = true;
+                hideStatus();
+            }
+        }
+
+        // 계정/비밀번호 변경 이벤트 연결
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('username').addEventListener('input', onInputChange);
+            document.getElementById('password').addEventListener('input', onInputChange);
+        });
+
+        // ============================================
+        // 비밀번호 표시/숨김
+        // ============================================
+        function togglePassword() {
+            var input = document.getElementById('password');
+            var icon = document.getElementById('eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+
+        // ============================================
+        // 상태 메시지 표시
+        // ============================================
+        function showStatus(type, message) {
+            var box = document.getElementById('status-box');
+            var iconEl = document.getElementById('status-icon');
+            var msgEl = document.getElementById('status-message');
+
+            box.className = 'status-box show ' + type;
+
+            if (type === 'loading') {
+                iconEl.innerHTML = '<span class="spinner-sm"></span>';
+            } else if (type === 'success') {
+                iconEl.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+            } else {
+                iconEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i>';
+            }
+
+            msgEl.textContent = message;
+        }
+
+        function hideStatus() {
+            document.getElementById('status-box').className = 'status-box';
+        }
+
+        // ============================================
+        // 폼 유효성 검사
+        // ============================================
+        function validate() {
+            var hosts = getHosts();
+            var username = document.getElementById('username').value.trim();
+            var password = document.getElementById('password').value;
+
+            if (hosts.length === 0) {
+                showStatus('error', 'APIC 주소를 1개 이상 입력하세요.');
+                return false;
+            }
+            if (!username) {
+                showStatus('error', 'Username을 입력하세요.');
+                return false;
+            }
+            if (!password) {
+                showStatus('error', 'Password를 입력하세요.');
+                return false;
+            }
+            return true;
+        }
+
+        // ============================================
+        // Test Connection
+        // ============================================
+        async function testConnection() {
+            if (!validate()) return;
+
+            var btnTest = document.getElementById('btn-test');
+            var btnSave = document.getElementById('btn-save');
+
+            btnTest.disabled = true;
+            btnSave.disabled = true;
+            testPassed = false;
+            showStatus('loading', 'APIC에 연결 중...');
+
+            try {
+                var resp = await fetch('/api/setup/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getFormData())
+                });
+
+                var result = await resp.json();
+
+                if (result.success) {
+                    testPassed = true;
+                    showStatus('success', result.message);
+                    btnSave.disabled = false;
+                } else {
+                    showStatus('error', result.message);
+                }
+
+            } catch (e) {
+                showStatus('error', '서버와 통신할 수 없습니다. 잠시 후 다시 시도하세요.');
+                console.error(e);
+            }
+
+            btnTest.disabled = false;
+        }
+
+        // ============================================
+        // Save & Go to Dashboard
+        // ============================================
+        async function saveConfig() {
+            if (!testPassed) {
+                showStatus('error', 'Test Connection을 먼저 통과해야 합니다.');
+                return;
+            }
+
+            var btnSave = document.getElementById('btn-save');
+            var btnTest = document.getElementById('btn-test');
+
+            btnSave.disabled = true;
+            btnTest.disabled = true;
+            showStatus('loading', '설정을 저장하는 중...');
+
+            try {
+                var resp = await fetch('/api/setup/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getFormData())
+                });
+
+                var result = await resp.json();
+
+                if (result.success) {
+                    showStatus('success', result.message);
+                    // 1초 대기 후 대시보드로 이동
+                    setTimeout(function () {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    showStatus('error', result.message);
+                    btnSave.disabled = false;
+                    btnTest.disabled = false;
+                }
+
+            } catch (e) {
+                showStatus('error', '저장 중 오류가 발생했습니다. 다시 시도하세요.');
+                console.error(e);
+                btnSave.disabled = false;
+                btnTest.disabled = false;
+            }
+        }
+    </script>
+
+</body>
+</html>

@@ -1,11 +1,11 @@
 # ============================================
 # ACI Ops WebUI - Backend Main
 # 목적: FastAPI 애플리케이션 진입점
-# 버전: v1.5.0 - APIC Failover, /api/all 병렬 처리
+# 버전: v1.9.0 - 초기 설정 UI (config.yaml 미존재 시 /setup 리다이렉트)
 #
 # 실행 방법:
 #   cd backend
-#   uvicorn main:app --reload --host 127.0.0.1 --port 8000
+#   uvicorn main:app --reload --host 0.0.0.0 --port 8000
 # ============================================
 
 import logging
@@ -14,8 +14,10 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import FastAPI, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 # ============================================
 # 경로 설정
@@ -32,24 +34,111 @@ from routers.health import get_health_data
 from routers.interface import get_interface_data
 from routers.linter import get_lint_data, lint_upload
 from routers.policy import get_policy_data
+from routers.setup import router as setup_router
 from routers.simulator import get_simulate_router
 from routers.topology import get_topology_data
 from services.aci_client import ACIClient
 
+# ============================================
+# 로거 설정
+# ============================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
 logger = logging.getLogger(__name__)
+
+# ============================================
+# config.yaml 경로
+# ============================================
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
 
 # ============================================
 # FastAPI 앱 인스턴스 생성
 # ============================================
 app = FastAPI(
     title="ACI Ops WebUI",
-    version="1.5.0",
+    version="1.9.0",
 )
 
 # ============================================
-# ACI 클라이언트 초기화
+# ACI 클라이언트 초기화 (지연 처리)
+# - config.yaml 없으면 None으로 유지 (서버 종료 없음)
+# - /setup 저장 완료 후 reinitialize_aci() 호출로 재초기화
 # ============================================
-aci = ACIClient()
+aci: ACIClient | None = None
+
+
+def _try_init_aci() -> ACIClient | None:
+    """
+    ACIClient 초기화 시도
+
+    - config.yaml 없으면 None 반환 (서버 종료 없음)
+    - 성공 시 ACIClient 인스턴스 반환
+    """
+    if not os.path.exists(CONFIG_PATH):
+        logger.warning("config.yaml 없음 — /setup으로 안내합니다.")
+        return None
+    try:
+        client = ACIClient(config_path=CONFIG_PATH)
+        logger.info("ACIClient 초기화 완료")
+        return client
+    except Exception as e:
+        logger.error("ACIClient 초기화 실패: %s", e)
+        return None
+
+
+aci = _try_init_aci()
+
+
+def reinitialize_aci() -> None:
+    """
+    /setup 저장 완료 후 ACIClient 재초기화
+
+    routers/setup.py의 setup_save()에서 config.yaml 저장 후 호출
+    """
+    global aci
+    aci = _try_init_aci()
+
+
+# setup.py에 reinitialize 콜백 주입
+import routers.setup as _setup_module  # noqa: E402
+
+_setup_module.reinitialize_aci = reinitialize_aci
+
+
+# ============================================
+# Middleware: config.yaml 미존재 시 /setup 리다이렉트
+# ============================================
+class SetupRedirectMiddleware(BaseHTTPMiddleware):
+    """
+    config.yaml 없을 때 /setup 이외 요청을 /setup으로 리다이렉트
+
+    통과 허용 경로:
+    - /setup          (설정 페이지 HTML)
+    - /api/setup/*    (설정 API)
+    - /static/*       (정적 파일)
+    - /docs, /openapi (FastAPI 자동 문서)
+    """
+
+    ALLOWED_PREFIXES = ("/setup", "/api/setup", "/static", "/docs", "/openapi")
+
+    async def dispatch(self, request: Request, call_next):
+        # config.yaml 존재하면 정상 통과
+        if os.path.exists(CONFIG_PATH):
+            return await call_next(request)
+
+        # 허용 경로는 통과
+        path = request.url.path
+        if any(path.startswith(prefix) for prefix in self.ALLOWED_PREFIXES):
+            return await call_next(request)
+
+        # 그 외 모든 요청 → /setup 리다이렉트
+        logger.info("config.yaml 없음 — %s → /setup 리다이렉트", path)
+        return RedirectResponse(url="/setup")
+
+
+app.add_middleware(SetupRedirectMiddleware)
 
 # ============================================
 # Static 파일 서빙 설정
@@ -57,9 +146,13 @@ aci = ACIClient()
 app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 
 # ============================================
-# 라우터 등록 (팩토리 패턴 — aci 인스턴스 주입 필요한 것만)
+# 라우터 등록
 # ============================================
-app.include_router(get_simulate_router(aci))
+app.include_router(setup_router)
+
+# Simulator: ACIClient 의존 (aci가 None이면 setup 완료 후 재기동 시 정상 등록)
+if aci is not None:
+    app.include_router(get_simulate_router(aci))
 
 
 # ============================================
@@ -71,6 +164,12 @@ app.include_router(get_simulate_router(aci))
 async def root():
     """메인 페이지"""
     return FileResponse("../frontend/index.html")
+
+
+@app.get("/setup")
+async def setup_page():
+    """초기 설정 페이지"""
+    return FileResponse("../frontend/setup.html")
 
 
 @app.get("/api/health")

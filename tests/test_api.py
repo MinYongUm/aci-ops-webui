@@ -1,6 +1,6 @@
 # ============================================
 # ACI Ops WebUI - API Test Suite
-# 버전: v1.4.0
+# 버전: v1.9.0
 # 목적: FastAPI 엔드포인트 단위 테스트 (APIC 미연결 환경)
 #
 # 실행 방법:
@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 import requests
 
 import pytest
@@ -975,3 +975,97 @@ class TestACIClientFailover:
 
         assert len(result) == 1
         assert "faultInst" in result[0]
+
+
+# ============================================
+# TestSetupTestAPI — POST /api/setup/test
+# ============================================
+
+
+class TestSetupSaveAPI:
+    ENDPOINT = "/api/setup/save"
+    VALID_PAYLOAD = {
+        "hosts": ["https://192.168.1.1"],
+        "username": "admin",
+        "password": "testpass",
+        "timeout": 30,
+        "retry": 3,
+    }
+
+    def test_save_success(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+
+        with (
+            patch("routers.setup.requests.Session") as mock_session_cls,
+            patch("builtins.open", mock_open()),
+            patch("routers.setup.yaml.dump") as mock_dump,
+        ):
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+        mock_dump.assert_called_once()
+
+    def test_save_blocked_on_connection_failure(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+
+        with (
+            patch("routers.setup.requests.Session") as mock_session_cls,
+            patch("builtins.open", mock_open()) as mock_file,
+        ):
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+        for call in mock_file.call_args_list:
+            assert "w" not in call.args and call.kwargs.get("mode") != "w"
+
+    def test_save_config_structure(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        captured = {}
+
+        def capture_dump(data, *args, **kwargs):
+            captured["data"] = data
+
+        with (
+            patch("routers.setup.requests.Session") as mock_session_cls,
+            patch("builtins.open", mock_open()),
+            patch("routers.setup.yaml.dump", side_effect=capture_dump),
+        ):
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        cfg = captured.get("data", {})
+        assert "apic" in cfg
+        assert "hosts" in cfg["apic"]
+        assert isinstance(cfg["apic"]["hosts"], list)
+        assert cfg["apic"]["username"] == "admin"
+        assert "linter" in cfg
+
+    def test_save_file_write_error(self, client):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+
+        with (
+            patch("routers.setup.requests.Session") as mock_session_cls,
+            patch("builtins.open", side_effect=OSError("Permission denied")),
+        ):
+            mock_session = MagicMock()
+            mock_session.post.return_value = mock_resp
+            mock_session_cls.return_value = mock_session
+            resp = client.post(self.ENDPOINT, json=self.VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False
+        assert "저장 실패" in resp.json()["message"]
