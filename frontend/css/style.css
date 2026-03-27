@@ -1,745 +1,1142 @@
-/* ============================================================
-   CSS VARIABLES — Light theme (단일 테마)
-   ============================================================ */
+/* ============================================
+   ACI Ops WebUI — style.css
+   v1.8.0: Cisco DevNet 다크 테마
+   ============================================ */
+
+/* ============================================
+   1. CSS 변수 (Cisco DevNet 다크 팔레트)
+   ============================================ */
 :root {
-    --sidebar-width: 240px;
-    --topbar-height: 54px;
+    /* 배경 계층 */
+    --bg-body:          #0d1421;
+    --bg-sidebar:       #0a1628;
+    --bg-card:          #1b2a3b;
+    --bg-card-hover:    #1e3048;
+    --bg-header:        #111e30;
+    --bg-input:         #0d1e30;
+    --bg-table-header:  #0f1e2e;
+    --bg-row-hover:     #1a2e42;
 
-    --bg-body:        #f0f2f5;
-    --bg-sidebar:     #1e293b;
-    --bg-card:        #ffffff;
-    --bg-card-hover:  #f8fafc;
-    --bg-topbar:      #ffffff;
-    --border-color:   #e2e8f0;
+    /* 테두리 */
+    --border-color:     #1e3a5f;
+    --border-accent:    #049fd4;
+    --border-subtle:    #162840;
 
-    --text-main:           #1e293b;
-    --text-muted:          #64748b;
-    --text-sidebar:        #94a3b8;
-    --text-sidebar-active: #f1f5f9;
+    /* 텍스트 */
+    --text-main:        #e4e8ed;
+    --text-muted:       #8fa3b8;
+    --text-dim:         #4d6a82;
+    --text-code:        #7dd3fc;
 
-    --accent:      #0284c7;
-    --accent-glow: rgba(2, 132, 199, 0.08);
+    /* Cisco 액센트 */
+    --cisco-blue:       #049fd4;
+    --cisco-blue-hover: #00bceb;
+    --cisco-blue-dim:   rgba(4, 159, 212, 0.15);
+    --cisco-glow:       rgba(4, 159, 212, 0.30);
+    --cisco-glow-soft:  rgba(4, 159, 212, 0.12);
 
-    --nav-active-bg: #0f172a;
+    /* 시맨틱 컬러 */
+    --color-critical:   #ef4444;
+    --color-major:      #f59e0b;
+    --color-minor:      #3b82f6;
+    --color-warning:    #f59e0b;
+    --color-success:    #22c55e;
+    --color-info:       #049fd4;
+    --color-glow-crit:  rgba(239, 68, 68, 0.20);
+    --color-glow-succ:  rgba(34, 197, 94, 0.20);
 
-    --color-critical: #dc2626;
-    --color-major:    #d97706;
-    --color-minor:    #16a34a;
-    --color-success:  #16a34a;
-    --color-info:     #0284c7;
+    /* 레이아웃 */
+    --sidebar-width:    240px;
+    --header-height:    64px;
+    --border-radius:    8px;
+    --border-radius-lg: 12px;
 
-    --font-mono: 'Courier New', Consolas, monospace;
+    /* Bootstrap 오버라이드 */
+    --bs-body-bg:           #0d1421;
+    --bs-body-color:        #e4e8ed;
+    --bs-border-color:      #1e3a5f;
+    --bs-secondary-bg:      #1b2a3b;
+    --bs-tertiary-bg:       #0f1e2e;
+    --bs-link-color:        #049fd4;
 }
 
-/* ============================================================
-   RESET & BASE
-   ============================================================ */
-*, *::before, *::after { box-sizing: border-box; }
+/* ============================================
+   2. 스크롤바 스타일링 (WebKit + Firefox)
+   ============================================ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-sidebar);
+}
+::-webkit-scrollbar-thumb {
+    background: #2a4060;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--cisco-blue);
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #2a4060 var(--bg-sidebar);
+}
+
+/* ============================================
+   3. 베이스
+   ============================================ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
 
 body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     margin: 0;
     padding: 0;
-    background: var(--bg-body);
-    color: var(--text-main);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 15px;
     overflow-x: hidden;
 }
 
-a { color: var(--accent); text-decoration: none; }
-
-/* ============================================================
-   SIDEBAR
-   ============================================================ */
+/* ============================================
+   4. 레이아웃: Sidebar + Main
+   ============================================ */
 .sidebar {
     position: fixed;
     top: 0;
     left: 0;
     width: var(--sidebar-width);
     height: 100vh;
-    background: var(--bg-sidebar);
+    background-color: var(--bg-sidebar);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    z-index: 1000;
+    z-index: 100;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
-.sidebar-brand {
-    padding: 18px 16px 14px;
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-}
-
-.sidebar-brand .brand-name {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.sidebar-brand .brand-ver {
-    font-size: 14px;
-    color: var(--text-sidebar);
-    margin-top: 2px;
-    font-family: var(--font-mono);
-}
-
-.sidebar-group-label {
-    padding: 14px 16px 5px;
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-sidebar);
-    flex-shrink: 0;
-}
-
-.sidebar-nav {
-    list-style: none;
-    margin: 0;
-    padding: 0 8px;
-    flex: 1;
-}
-
-.sidebar-nav li { margin-bottom: 1px; }
-
-.sidebar-nav-item {
-    display: flex;
-    align-items: center;
-    padding: 7px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    color: var(--text-sidebar);
-    transition: all 0.12s ease;
-    gap: 9px;
-    user-select: none;
-}
-
-.sidebar-nav-item:hover {
-    background: var(--nav-active-bg);
-    color: var(--text-sidebar-active);
-}
-
-.sidebar-nav-item.active {
-    background: var(--accent-glow);
-    color: var(--accent);
-    font-weight: 600;
-}
-
-.nav-icon  { width: 16px; text-align: center; font-size: 14px; flex-shrink: 0; }
-.nav-label { font-size: 15px; flex: 1; }
-
-.nav-badge {
-    font-size: 14px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 8px;
-    background: rgba(220, 38, 38, 0.15);
-    color: var(--color-critical);
-    line-height: 1.5;
-}
-
-.nav-badge.warn {
-    background: rgba(217, 119, 6, 0.15);
-    color: var(--color-major);
-}
-
-/* ---- Sidebar Footer ---- */
-.sidebar-footer {
-    padding: 12px 16px;
-    border-top: 1px solid var(--border-color);
-    flex-shrink: 0;
-}
-
-.sidebar-conn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    color: var(--text-muted);
-    margin-bottom: 10px;
-}
-
-.conn-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-success);
-    box-shadow: 0 0 5px var(--color-success);
-    flex-shrink: 0;
-}
-
-.conn-dot.off {
-    background: var(--color-critical);
-    box-shadow: 0 0 5px var(--color-critical);
-}
-
-.footer-controls {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.auto-refresh-wrap {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 14px;
-    color: var(--text-muted);
-}
-
-.form-check-input { cursor: pointer; }
-
-/* ============================================================
-   MAIN CONTENT
-   ============================================================ */
-.main-content {
+.main-wrapper {
     margin-left: var(--sidebar-width);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
-/* ---- Topbar ---- */
-.topbar {
-    position: sticky;
-    top: 0;
-    height: var(--topbar-height);
-    background: var(--bg-topbar);
+/* ============================================
+   5. 사이드바 브랜드 영역 (v1.8.0 신규)
+   ============================================ */
+.sidebar-brand {
+    padding: 20px 16px 18px;
     border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    z-index: 100;
     flex-shrink: 0;
 }
 
-.topbar-left {
+.brand-logo {
     display: flex;
     align-items: center;
-    gap: 10px;
-}
-
-.topbar-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-main);
-}
-
-.topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.last-update-label {
-    font-size: 15px;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-}
-
-/* ---- Page Sections ---- */
-.page-section {
-    display: none;
-    padding: 24px;
-    flex: 1;
-    animation: fadeIn 0.15s ease;
-}
-
-.page-section.active { display: block; }
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ============================================================
-   CARDS
-   ============================================================ */
-.card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    margin-bottom: 16px;
-}
-
-.card-header {
-    background: transparent;
-    border-bottom: 1px solid var(--border-color);
-    padding: 11px 16px;
-    font-size: 15px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.card-body { padding: 16px; }
-
-/* ============================================================
-   STAT CARDS — Dashboard
-   ============================================================ */
-.stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 10px;
-    margin-bottom: 18px;
-}
-
-.stat-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 14px 16px;
-}
-
-.stat-card.state-critical {
-    border-color: rgba(248, 81, 73, 0.5);
-    background: rgba(248, 81, 73, 0.05);
-}
-
-.stat-card.state-warn {
-    border-color: rgba(227, 160, 8, 0.4);
-    background: rgba(227, 160, 8, 0.04);
-}
-
-.stat-value {
-    font-size: 30px;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 5px;
-    font-family: var(--font-mono);
-}
-
-.stat-label {
-    font-size: 15px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.stat-sub {
-    font-size: 14px;
-    color: var(--text-muted);
-    margin-top: 3px;
-    font-family: var(--font-mono);
-}
-
-/* ============================================================
-   MODULE STATUS GRID — Dashboard
-   ============================================================ */
-.module-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 8px;
-    margin-bottom: 18px;
-}
-
-.module-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-left: 3px solid var(--border-color);
-    border-radius: 8px;
-    padding: 10px 14px;
-    cursor: pointer;
-    transition: all 0.12s ease;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.module-card:hover { background: var(--bg-card-hover); }
-.module-card.mod-ok       { border-left-color: var(--color-success); }
-.module-card.mod-warn     { border-left-color: var(--color-major); }
-.module-card.mod-critical { border-left-color: var(--color-critical); }
-.module-card.mod-neutral  { border-left-color: var(--border-color); }
-
-.mod-icon  { font-size: 17px; }
-.mod-info  { flex: 1; }
-.mod-name  { font-size: 15px; font-weight: 600; }
-.mod-value { font-size: 14px; color: var(--text-muted); }
-
-/* ============================================================
-   TOPOLOGY
-   ============================================================ */
-.topo-layer { margin-bottom: 14px; }
-
-.topo-label {
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
+    gap: 12px;
     margin-bottom: 6px;
 }
 
-.topo-nodes { display: flex; flex-wrap: wrap; gap: 6px; }
+.brand-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--cisco-blue), #006f96);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: #ffffff;
+    flex-shrink: 0;
+    box-shadow: 0 0 12px var(--cisco-glow-soft);
+}
 
-.node-chip {
+.brand-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.brand-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+}
+
+.brand-version {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--cisco-blue);
+    background-color: var(--cisco-blue-dim);
+    border: 1px solid rgba(4, 159, 212, 0.25);
+    border-radius: 3px;
+    padding: 1px 5px;
+    letter-spacing: 0.04em;
+    width: fit-content;
+}
+
+.brand-tagline {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+    padding-left: 48px;
+}
+
+/* ============================================
+   6. 사이드바 네비게이션
+   ============================================ */
+.sidebar-nav {
+    flex: 1;
+    padding: 8px 0;
+    overflow-y: auto;
+}
+
+.nav-group {
+    margin-bottom: 4px;
+}
+
+.nav-group-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 12px 16px 4px;
+}
+
+.nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* nav-item 구조 (v1.8.0): icon + label + badge 독립 영역 */
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    cursor: pointer;
+    border-radius: 0;
+    position: relative;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+    margin: 1px 0;
+}
+
+.nav-item:hover {
+    background-color: rgba(4, 159, 212, 0.08);
+    color: var(--text-main);
+    border-left-color: rgba(4, 159, 212, 0.30);
+}
+
+/* active 상태 강화 (v1.8.0) */
+.nav-item.active {
+    background-color: var(--cisco-blue-dim);
+    color: var(--cisco-blue);
+    border-left-color: var(--cisco-blue);
+    font-weight: 600;
+}
+
+.nav-item.active .nav-icon {
+    color: var(--cisco-blue);
+}
+
+.nav-item.active::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background-color: var(--cisco-blue);
+    border-radius: 2px 0 0 2px;
+    box-shadow: 0 0 8px var(--cisco-glow);
+}
+
+.nav-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    color: inherit;
+    transition: color 0.15s ease;
+}
+
+.nav-label {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 배지 (오른쪽 고정) */
+.nav-badge {
+    flex-shrink: 0;
+    font-size: 0.62rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    padding: 0 5px;
     display: inline-flex;
     align-items: center;
-    padding: 5px 13px;
-    border-radius: 20px;
-    font-size: 15px;
-    font-weight: 600;
-    background: var(--bg-body);
-    border: 1px solid var(--border-color);
-    gap: 6px;
-    font-family: var(--font-mono);
+    justify-content: center;
+    background-color: var(--color-critical);
+    color: #ffffff;
+    line-height: 1;
 }
 
-.topo-line {
-    height: 1px;
-    background: var(--border-color);
-    margin: 10px 40px;
+.nav-badge:empty {
+    display: none;
 }
 
-/* ============================================================
-   STATUS INDICATORS
-   ============================================================ */
-.dot {
+/* ============================================
+   7. 사이드바 푸터 (v1.8.0 신규)
+   ============================================ */
+.sidebar-footer {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.conn-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 6px;
+}
+
+.conn-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
+    background-color: var(--text-dim);
     flex-shrink: 0;
+    transition: background-color 0.3s ease;
 }
 
-.dot-up   { background: var(--color-success); box-shadow: 0 0 4px var(--color-success); }
-.dot-down { background: var(--color-critical); box-shadow: 0 0 4px var(--color-critical); }
+.conn-dot.connected {
+    background-color: var(--color-success);
+    box-shadow: 0 0 6px var(--color-glow-succ);
+}
 
-/* ============================================================
-   SEVERITY BADGES
-   ============================================================ */
-.sev {
-    display: inline-block;
-    font-size: 14px;
+.conn-dot.disconnected {
+    background-color: var(--color-critical);
+    box-shadow: 0 0 6px var(--color-glow-crit);
+}
+
+.conn-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.last-update-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 0.72rem;
+}
+
+/* ============================================
+   8. 섹션 헤더 (v1.8.0 신규)
+   ============================================ */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px 16px;
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    min-height: var(--header-height);
+}
+
+.section-title-area {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.section-title {
+    font-size: 1.3rem;
     font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    color: var(--text-main);
+    margin: 0;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
 }
 
-.sev-critical { background: rgba(248,81,73,0.15); color: var(--color-critical); }
-.sev-major    { background: rgba(227,160,8,0.15); color: var(--color-major); }
-.sev-minor    { background: rgba(63,185,80,0.12); color: var(--color-minor); }
-.sev-warning  { background: rgba(139,148,158,0.15); color: var(--text-muted); }
-.sev-ok       { background: rgba(63,185,80,0.12); color: var(--color-success); }
-.sev-info     { background: rgba(88,166,255,0.12); color: var(--color-info); }
+.section-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+}
 
-/* ============================================================
-   TABLES
-   ============================================================ */
+.section-actions {
+    display: flex;
+    align-items: center;
+}
+
+/* 섹션 바디 */
+.section-body {
+    flex: 1;
+    padding: 24px 28px;
+    overflow-y: auto;
+}
+
+.loading-placeholder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+/* ============================================
+   9. 카드 (Cisco DevNet 다크 + hover glow)
+   ============================================ */
+.card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    margin-bottom: 20px;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+}
+
+/* 카드 hover glow (v1.8.0 UX 개선) */
+.card:hover {
+    background-color: var(--bg-card-hover);
+    border-color: rgba(4, 159, 212, 0.35);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(4, 159, 212, 0.15),
+        0 0 20px var(--cisco-glow-soft);
+    transform: translateY(-1px);
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--cisco-blue);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+}
+
+.card-body {
+    padding: 16px;
+}
+
+/* ============================================
+   10. 통계 카드 (stat-card)
+   ============================================ */
+.stat-card {
+    text-align: center;
+    padding: 20px 16px;
+}
+
+.stat-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+/* ============================================
+   11. 테이블
+   ============================================ */
 .table {
     color: var(--text-main);
+    border-color: var(--border-color);
     margin-bottom: 0;
 }
 
 .table thead th {
-    background: transparent;
-    border-color: var(--border-color);
-    color: var(--text-muted);
-    font-size: 14px;
+    background-color: var(--bg-table-header);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    padding: 8px 14px;
+    color: var(--text-muted);
+    padding: 10px 12px;
+    white-space: nowrap;
 }
 
 .table td {
-    border-color: var(--border-color);
-    padding: 8px 14px;
+    border-color: var(--border-subtle);
+    padding: 10px 12px;
+    font-size: 0.85rem;
     vertical-align: middle;
+    transition: background-color 0.12s ease;
 }
 
-.table tbody tr:hover { background: var(--bg-card-hover); }
-.table-responsive { border-radius: 0 0 8px 8px; }
+.table tbody tr:hover td {
+    background-color: var(--bg-row-hover);
+}
 
-/* ============================================================
-   FORMS
-   ============================================================ */
-.form-control, .form-select {
-    background: var(--bg-body);
-    border: 1px solid var(--border-color);
+.table-sm td,
+.table-sm th {
+    padding: 7px 10px;
+}
+
+/* ============================================
+   12. 배지
+   ============================================ */
+.badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 3px 7px;
+}
+
+.badge.bg-danger   { background-color: rgba(239, 68, 68, 0.2)   !important; color: #fca5a5 !important; border: 1px solid rgba(239, 68, 68, 0.4); }
+.badge.bg-warning  { background-color: rgba(245, 158, 11, 0.2)  !important; color: #fcd34d !important; border: 1px solid rgba(245, 158, 11, 0.4); }
+.badge.bg-success  { background-color: rgba(34, 197, 94, 0.2)   !important; color: #86efac !important; border: 1px solid rgba(34, 197, 94, 0.4); }
+.badge.bg-primary  { background-color: var(--cisco-blue-dim)    !important; color: var(--cisco-blue) !important; border: 1px solid rgba(4, 159, 212, 0.35); }
+.badge.bg-info     { background-color: rgba(4, 159, 212, 0.15)  !important; color: #67e8f9 !important; border: 1px solid rgba(4, 159, 212, 0.35); }
+.badge.bg-secondary{ background-color: rgba(143, 163, 184, 0.12)!important; color: var(--text-muted) !important; border: 1px solid rgba(143, 163, 184, 0.25); }
+
+/* ============================================
+   13. 버튼
+   ============================================ */
+.btn-cisco {
+    background-color: var(--cisco-blue);
+    border-color: var(--cisco-blue);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-cisco:hover {
+    background-color: var(--cisco-blue-hover);
+    border-color: var(--cisco-blue-hover);
+    color: #ffffff;
+    box-shadow: 0 0 12px var(--cisco-glow);
+}
+
+.btn-outline-cisco {
+    border-color: var(--cisco-blue);
+    color: var(--cisco-blue);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: transparent;
+    transition: all 0.15s ease;
+}
+
+.btn-outline-cisco:hover {
+    background-color: var(--cisco-blue-dim);
+    border-color: var(--cisco-blue);
+    color: var(--cisco-blue);
+    box-shadow: 0 0 8px var(--cisco-glow-soft);
+}
+
+.btn-outline-secondary {
+    border-color: var(--border-color);
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 0.8rem;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--bg-row-hover);
+    border-color: var(--border-accent);
     color: var(--text-main);
-    font-size: 15px;
-    border-radius: 6px;
 }
 
-.form-control:focus, .form-select:focus {
-    background: var(--bg-body);
-    border-color: var(--accent);
+/* Auto-refresh 토글 */
+.auto-refresh-toggle .form-check-input {
+    background-color: var(--bg-input);
+    border-color: var(--border-color);
+}
+
+.auto-refresh-toggle .form-check-input:checked {
+    background-color: var(--cisco-blue);
+    border-color: var(--cisco-blue);
+}
+
+.auto-refresh-toggle .form-check-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   14. 폼 / 입력
+   ============================================ */
+.form-control,
+.form-select {
+    background-color: var(--bg-input);
+    border-color: var(--border-color);
     color: var(--text-main);
-    box-shadow: 0 0 0 2px var(--accent-glow);
+    font-size: 0.85rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.form-control::placeholder { color: var(--text-muted); }
-.form-select option { background: var(--bg-card); }
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bg-input);
+    border-color: var(--cisco-blue);
+    color: var(--text-main);
+    box-shadow: 0 0 0 3px var(--cisco-glow-soft);
+}
+
+.form-control::placeholder {
+    color: var(--text-dim);
+}
 
 .input-group-text {
-    background: var(--bg-card);
+    background-color: var(--bg-input);
     border-color: var(--border-color);
     color: var(--text-muted);
-    font-size: 15px;
 }
 
-.form-label {
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    margin-bottom: 5px;
-}
-
-/* ============================================================
-   BUTTONS
-   ============================================================ */
-.btn-accent {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    font-size: 15px;
-    font-weight: 600;
-    padding: 7px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: opacity 0.12s;
-}
-
-.btn-accent:hover { opacity: 0.85; color: #fff; }
-
-.btn-ghost {
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-    font-size: 15px;
-    padding: 7px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.12s;
-}
-
-.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-
-.btn-sm-icon {
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-    padding: 5px 9px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.12s;
-}
-
-.btn-sm-icon:hover { border-color: var(--accent); color: var(--accent); }
-
-/* ============================================================
-   INFO BOXES
-   ============================================================ */
-.info-box {
-    background: rgba(2, 132, 199, 0.06);
-    border: 1px solid rgba(2, 132, 199, 0.2);
-    border-radius: 6px;
-    padding: 9px 14px;
-    font-size: 15px;
-    color: var(--color-info);
-}
-
-.ok-box {
-    background: rgba(22, 163, 74, 0.06);
-    border: 1px solid rgba(22, 163, 74, 0.2);
-    border-radius: 6px;
-    padding: 9px 14px;
-    font-size: 15px;
-    color: var(--color-success);
-}
-
-.warn-box {
-    background: rgba(217, 119, 6, 0.06);
-    border: 1px solid rgba(217, 119, 6, 0.2);
-    border-radius: 6px;
-    padding: 9px 14px;
-    font-size: 15px;
-    color: var(--color-major);
-}
-
-.critical-box {
-    background: rgba(220, 38, 38, 0.06);
-    border: 1px solid rgba(220, 38, 38, 0.2);
-    border-radius: 6px;
-    padding: 9px 14px;
-    font-size: 15px;
-    color: var(--color-critical);
-}
-
-/* ============================================================
-   TOOLTIPS — ? 아이콘 hover 시 설명 팝업
-   ============================================================ */
-.help-wrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
-
-.help-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--border-color);
-    color: var(--text-muted);
-    font-size: 10px;
-    font-weight: 700;
-    cursor: help;
-    flex-shrink: 0;
-}
-
-.tooltip-box {
-    display: none;
-    position: absolute;
-    left: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 12px 14px;
-    width: 290px;
-    font-size: 15px;
-    color: #f1f5f9;
-    z-index: 9000;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-    line-height: 1.6;
-}
-
-.help-wrap:hover .tooltip-box { display: block; }
-
-.tooltip-title {
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--accent);
-    margin-bottom: 8px;
-}
-
-.tooltip-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 5px;
-    align-items: flex-start;
-    font-size: 15px;
-}
-
-.tooltip-key { font-weight: 700; flex-shrink: 0; }
-.tooltip-val { color: #94a3b8; }
-
-/* ============================================================
-   SIMULATOR
-   ============================================================ */
-.sim-grid {
-    display: grid;
-    grid-template-columns: 1fr 40px 1fr;
-    gap: 12px;
-    align-items: end;
-    margin-bottom: 14px;
-}
-
-.sim-arrow {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    font-size: 18px;
-    padding-bottom: 4px;
-}
-
-.verdict-box {
-    text-align: center;
-    padding: 16px;
-    border-radius: 8px;
-    margin-bottom: 14px;
-}
-
-.verdict-allow {
-    background: rgba(63,185,80,0.08);
-    border: 1px solid rgba(63,185,80,0.3);
-}
-
-.verdict-deny {
-    background: rgba(248,81,73,0.08);
-    border: 1px solid rgba(248,81,73,0.3);
-}
-
-.verdict-label {
-    font-size: 26px;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    letter-spacing: 0.05em;
-}
-
-/* ============================================================
-   CODE
-   ============================================================ */
-code {
-    font-family: var(--font-mono);
-    font-size: 15px;
-    color: var(--accent);
-    background: var(--accent-glow);
-    padding: 1px 5px;
-    border-radius: 3px;
-}
-
-/* ============================================================
-   PROGRESS BAR
-   ============================================================ */
+/* ============================================
+   15. 프로그레스 바
+   ============================================ */
 .progress {
-    background: var(--bg-body);
+    background-color: var(--bg-input);
     border-radius: 4px;
-    height: 16px;
+    height: 20px;
 }
 
-/* ============================================================
-   LOADING OVERLAY
-   ============================================================ */
+.progress-bar.bg-success {
+    background-color: #16a34a !important;
+}
+
+.progress-bar.bg-danger {
+    background-color: #dc2626 !important;
+}
+
+/* ============================================
+   16. 알림 (Alert)
+   ============================================ */
+.alert-success {
+    background-color: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #86efac;
+}
+
+.alert-danger {
+    background-color: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+}
+
+.alert-warning {
+    background-color: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+}
+
+.alert-info {
+    background-color: rgba(4, 159, 212, 0.12);
+    border-color: rgba(4, 159, 212, 0.35);
+    color: #7dd3fc;
+}
+
+/* ============================================
+   17. 리스트 그룹
+   ============================================ */
+.list-group-item {
+    background-color: transparent;
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+    font-size: 0.85rem;
+}
+
+.list-group-item-action:hover {
+    background-color: var(--bg-row-hover);
+    color: var(--text-main);
+    border-color: var(--border-subtle);
+}
+
+/* ============================================
+   18. 모달
+   ============================================ */
+.modal-content {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+    border-bottom-color: var(--border-color);
+    padding: 16px 20px;
+}
+
+.modal-footer {
+    border-top-color: var(--border-color);
+}
+
+.modal-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* ============================================
+   19. 로딩 오버레이
+   ============================================ */
 #loading-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 9998;
+    background-color: rgba(10, 22, 40, 0.75);
+    z-index: 9999;
     display: none;
     justify-content: center;
     align-items: center;
+    backdrop-filter: blur(2px);
 }
 
-.spinner-box {
-    background: var(--bg-card);
+.loading-box {
+    background-color: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 24px 40px;
+    border-radius: var(--border-radius-lg);
+    padding: 32px 52px;
     text-align: center;
-    color: var(--text-muted);
-    font-size: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px var(--cisco-glow-soft);
 }
 
-/* ============================================================
-   MODALS
-   ============================================================ */
-.modal-content {
-    background: var(--bg-card);
+.loading-ring {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--cisco-blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 12px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* spinner-border에 cisco 색상 적용 */
+.text-cisco {
+    color: var(--cisco-blue) !important;
+}
+
+/* ============================================
+   20. 코드
+   ============================================ */
+code {
+    color: var(--text-code);
+    background-color: rgba(125, 211, 252, 0.08);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.82em;
+}
+
+/* ============================================
+   21. 토폴로지
+   ============================================ */
+.topology-container {
+    padding: 16px;
+    text-align: center;
+}
+
+.layer-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    margin: 16px 0 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.node-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    margin: 4px;
+    border-radius: 50px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background-color: var(--bg-card);
     border: 1px solid var(--border-color);
     color: var(--text-main);
+    cursor: pointer;
+    transition:
+        transform 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
 }
 
-.modal-header, .modal-footer { border-color: var(--border-color); }
+.node-chip:hover {
+    transform: scale(1.04);
+    border-color: var(--cisco-blue);
+    box-shadow: 0 0 10px var(--cisco-glow-soft);
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.dot-up {
+    background-color: var(--color-success);
+    box-shadow: 0 0 5px var(--color-glow-succ);
+}
+
+.dot-down {
+    background-color: var(--color-critical);
+    box-shadow: 0 0 5px var(--color-glow-crit);
+}
+
+.connector-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+    margin: 12px 8%;
+}
+
+/* ============================================
+   22. 섹션 내 공통 레이아웃
+   ============================================ */
+.section-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 1100px) {
+    .section-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 검색 박스 */
+.search-box {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 16px;
+    margin-bottom: 20px;
+    transition: border-color 0.15s ease;
+}
+
+.search-box:focus-within {
+    border-color: rgba(4, 159, 212, 0.4);
+}
+
+/* ============================================
+   23. 유틸리티 색상
+   ============================================ */
+.text-cisco    { color: var(--cisco-blue) !important; }
+.text-critical { color: var(--color-critical) !important; }
+.text-major    { color: var(--color-major) !important; }
+.text-success-dm { color: var(--color-success) !important; }
+.text-muted    { color: var(--text-muted) !important; }
+.text-dim      { color: var(--text-dim) !important; }
+
+/* Bootstrap 텍스트 유틸리티 다크 오버라이드 */
+.text-danger  { color: var(--color-critical) !important; }
+.text-warning { color: var(--color-warning) !important; }
+.text-success { color: var(--color-success) !important; }
+.text-info    { color: var(--color-info) !important; }
+.text-primary { color: var(--cisco-blue) !important; }
+
+/* Bootstrap btn-primary 오버라이드 */
+.btn-primary {
+    background-color: var(--cisco-blue);
+    border-color: var(--cisco-blue);
+}
+
+.btn-primary:hover {
+    background-color: var(--cisco-blue-hover);
+    border-color: var(--cisco-blue-hover);
+    box-shadow: 0 0 10px var(--cisco-glow);
+}
+
+/* ============================================
+   24. Module Status Grid (Dashboard)
+   ============================================ */
+.module-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.module-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    border-left-width: 3px;
+    background-color: var(--bg-body);
+    cursor: pointer;
+    transition:
+        border-color 0.15s ease,
+        background-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.12s ease;
+}
+
+.module-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 12px var(--cisco-glow-soft);
+}
+
+.module-card.mod-ok       { border-left-color: var(--color-success); }
+.module-card.mod-warn     { border-left-color: var(--color-major); }
+.module-card.mod-critical { border-left-color: var(--color-critical); }
+.module-card.mod-neutral  { border-left-color: var(--border-accent); }
+
+.mod-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.mod-ok       .mod-icon { color: var(--color-success); }
+.mod-warn     .mod-icon { color: var(--color-major); }
+.mod-critical .mod-icon { color: var(--color-critical); }
+.mod-neutral  .mod-icon { color: var(--cisco-blue); }
+
+.mod-info { min-width: 0; }
+
+.mod-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mod-value {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* stat-card 상태 강조 */
+.stat-card.state-critical {
+    border-color: rgba(239, 68, 68, 0.45);
+    background-color: rgba(239, 68, 68, 0.07);
+}
+
+.stat-card.state-warn {
+    border-color: rgba(245, 158, 11, 0.45);
+    background-color: rgba(245, 158, 11, 0.07);
+}
+
+/* sev 배지 (audit actionBadge용) */
+.sev {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 2px 7px;
+    border: 1px solid transparent;
+}
+
+.sev.sev-critical {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.sev.sev-major {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
+.sev.sev-minor {
+    background-color: rgba(4, 159, 212, 0.15);
+    color: var(--cisco-blue);
+    border-color: rgba(4, 159, 212, 0.35);
+}
+
+.sev.sev-warning {
+    background-color: rgba(143, 163, 184, 0.12);
+    color: var(--text-muted);
+    border-color: rgba(143, 163, 184, 0.25);
+}
+
+/* ============================================
+   25. 섹션 Linter / Simulator 전용
+   ============================================ */
+
+/* 알림 박스 (ok / warn / critical / info) */
+.ok-box, .warn-box, .critical-box, .info-box {
+    padding: 10px 14px;
+    border-radius: var(--border-radius);
+    border: 1px solid transparent;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+
+.ok-box {
+    background-color: rgba(34, 197, 94, 0.10);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #86efac;
+}
+
+.warn-box {
+    background-color: rgba(245, 158, 11, 0.10);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+}
+
+.critical-box {
+    background-color: rgba(239, 68, 68, 0.10);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+}
+
+.info-box {
+    background-color: rgba(4, 159, 212, 0.10);
+    border-color: rgba(4, 159, 212, 0.35);
+    color: #7dd3fc;
+}
+
+/* stat-card 추가 상태 (interface miniStatCard용) */
+.stat-card.state-ok {
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.stat-card.state-warn {
+    border-color: rgba(245, 158, 11, 0.45);
+    background-color: rgba(245, 158, 11, 0.07);
+}
+
+/* sev 추가 클래스 */
+.sev.sev-info {
+    background-color: rgba(4, 159, 212, 0.15);
+    color: var(--cisco-blue);
+    border-color: rgba(4, 159, 212, 0.35);
+}
+
+.sev.sev-warning {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+/* outline-cisco 버튼 */
+.btn-outline-cisco {
+    border-color: var(--cisco-blue);
+    color: var(--cisco-blue);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: transparent;
+    transition: all 0.15s ease;
+}
+
+.btn-outline-cisco:hover {
+    background-color: var(--cisco-blue-dim);
+    border-color: var(--cisco-blue);
+    color: var(--cisco-blue);
+    box-shadow: 0 0 8px var(--cisco-glow-soft);
+}
+.linter-issue {
+    border-left: 3px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    background-color: var(--bg-input);
+    margin-bottom: 8px;
+    font-size: 0.83rem;
+}
+
+.linter-issue.critical {
+    border-left-color: var(--color-critical);
+    background-color: var(--color-glow-crit);
+}
+
+.linter-issue.warning {
+    border-left-color: var(--color-warning);
+    background-color: rgba(245, 158, 11, 0.08);
+}
+
+.sim-result-allow {
+    background-color: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-success);
+}
+
+.sim-result-deny {
+    background-color: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-critical);
+}
+
+/* ============================================
+   25. 반응형 (좁은 화면 대응)
+   ============================================ */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .main-wrapper {
+        margin-left: 0;
+    }
+}

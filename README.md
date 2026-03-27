@@ -47,7 +47,7 @@ copy config.yaml.example config.yaml
 # config.yaml 편집: hosts, username, password 입력
 ```
 
-### config.yaml 구조 (v1.5.0)
+### config.yaml 구조
 
 ```yaml
 apic:
@@ -165,9 +165,9 @@ aci-ops-webui/
 │       ├── linter.py            # Config Linter API
 │       └── simulator.py         # Microsegmentation Simulator API
 ├── frontend/
-│   ├── index.html               # 대시보드 HTML 뼈대 (v1.7.0)
+│   ├── index.html               # 대시보드 HTML 뼈대 (v1.8.0)
 │   ├── css/
-│   │   └── style.css            # 전체 CSS
+│   │   └── style.css            # Cisco DevNet 다크 테마 (v1.8.0)
 │   └── js/
 │       ├── common.js            # STATE, 네비게이션, apiFetch, 유틸리티
 │       ├── dashboard.js
@@ -191,7 +191,7 @@ aci-ops-webui/
 pytest tests/ -v
 ```
 
-v1.7.0 기준: 61 passed, 1 skipped
+v1.8.0 기준: 61 passed, 1 skipped
 
 Ubuntu 서버에서 pytest PATH 미인식 시:
 ```

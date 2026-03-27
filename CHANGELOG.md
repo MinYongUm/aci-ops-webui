@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.8.0] - 2026-03-27
+
+### Added
+- 섹션 헤더 추가 (타이틀 + 부제목 + Refresh 버튼 + Auto 30s 토글)
+- 사이드바 브랜드 영역 재설계 (아이콘 박스 + v1.8.0 배지 + "Cisco ACI Operations" 태그라인)
+- 사이드바 푸터 추가 (Connected 상태 dot + 마지막 업데이트 시각)
+
+### Changed
+- UI 리뉴얼: Cisco DevNet 다크 테마 전면 적용
+  - CSS 변수 기반 팔레트 (`--bg-body: #0d1421`, `--cisco-blue: #049fd4` 등)
+  - 카드 hover glow 효과 (`box-shadow` + `translateY(-1px)`)
+  - 스크롤바 스타일링 (WebKit + Firefox)
+  - 사이드바 active 강화 (좌측 3px 바 + 우측 glow dot)
+- nav-item 구조 변경 (`.nav-icon` / `.nav-label` / `.nav-badge` 3개 요소 명시적 분리, 아이콘 교체)
+- 모든 모듈 JS scaffold inject 방식으로 전환
+  - `section-body` 단일 컨테이너 구조 대응
+  - 각 `load{Module}()` 진입 시 `_build{Module}Scaffold()`로 HTML 먼저 inject 후 데이터 채움
+
+### Fixed
+- `currentSection = 'dashboard'` 초기값으로 인한 `/api/all` 중복 호출 버그 수정
+  - 원인: 페이지 로드 시 `navigateTo('dashboard')` 호출 → `section === currentSection` 조건 true
+    → `refreshCurrent()` 경로 진입 → `loadDashboard()` 중복 실행
+  - 수정: `currentSection = null` 초기화 → 첫 진입 시 정상 경로만 실행
+
+### Test
+- 61 passed, 1 skipped (변동 없음 — 백엔드 변경 없음)
+
 ## [1.7.0] - 2026-03-27
 
 ### Added

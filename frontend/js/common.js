@@ -1,28 +1,41 @@
 // ============================================================
 // common.js — 공통 상태, 네비게이션, 유틸리티
+// 버전: v1.8.0 — currentSection null 초기화 버그 수정
+//
 // 로딩 순서: 반드시 모든 모듈별 JS보다 먼저 로드
 // ============================================================
 
 // ============================================================
-// CONSTANTS
+// SECTION METADATA (v1.8.0: 섹션 타이틀 + 부제목)
 // ============================================================
-var SECTION_TITLES = {
-    dashboard:  'Dashboard',
-    health:     'Health Check',
-    policy:     'Policy Check',
-    interface:  'Interface Monitor',
-    endpoint:   'Endpoint Tracker',
-    audit:      'Audit Log',
-    capacity:   'Capacity Report',
-    topology:   'Topology Viewer',
-    linter:     'Config Linter',
-    simulator:  'Microseg Simulator'
+var SECTION_META = {
+    dashboard:  { title: 'Dashboard',          subtitle: 'ACI Fabric 운영 현황 요약' },
+    health:     { title: 'Health Check',       subtitle: 'Fault 및 노드 상태 모니터링' },
+    policy:     { title: 'Policy Check',       subtitle: 'Contract 정책 검증 및 보안 감사' },
+    interface:  { title: 'Interface Monitor',  subtitle: '물리 인터페이스 상태 및 에러 분석' },
+    endpoint:   { title: 'Endpoint Tracker',   subtitle: 'MAC / IP 기반 Endpoint 위치 추적' },
+    audit:      { title: 'Audit Log',          subtitle: 'APIC 설정 변경 이력 조회' },
+    capacity:   { title: 'Capacity Report',    subtitle: 'TCAM 용량 사용률 모니터링' },
+    topology:   { title: 'Topology Viewer',    subtitle: 'Spine-Leaf Fabric 토폴로지 시각화' },
+    linter:     { title: 'Config Linter',      subtitle: 'ACI 정책 오류 및 Best Practice 검증' },
+    simulator:  { title: 'Microseg Simulator', subtitle: 'EPG 간 트래픽 허용/차단 정책 시뮬레이션' }
 };
 
 // ============================================================
 // STATE
 // ============================================================
-var currentSection   = 'dashboard';
+
+// ============================================================
+// [BUG FIX v1.8.0]
+// 기존: var currentSection = 'dashboard'
+// 문제: 페이지 로드 시 init block이 navigateTo('dashboard') 호출
+//       → section === currentSection ('dashboard' === 'dashboard') 조건 true
+//       → refreshCurrent() 경로로 진입 → loadDashboard() 중복 실행
+//       → /api/all 이 정상 경로 + refreshCurrent() 경로로 중복 호출됨
+// 수정: null로 초기화
+//       첫 navigateTo('dashboard') 호출 시 null !== 'dashboard' → 정상 경로만 실행
+// ============================================================
+var currentSection   = null;
 var autoRefreshTimer = null;
 var cachedAll        = null;   // /api/all 응답 캐시 (CSV 내보내기용)
 var simTenants       = [];     // 시뮬레이터 Tenant 목록 캐시
@@ -32,22 +45,30 @@ var cachedFaults     = [];     // Health 섹션 Fault 상세 (모달용)
 // NAVIGATION
 // ============================================================
 function navigateTo(section) {
-    if (section === currentSection) { refreshCurrent(); return; }
+    // --------------------------------------------------------
+    // 같은 섹션 재클릭 → 단순 새로고침 (정상 동작)
+    // 초기 로드 시에는 currentSection = null 이므로 이 분기 미실행
+    // --------------------------------------------------------
+    if (section === currentSection) {
+        refreshCurrent();
+        return;
+    }
 
     currentSection = section;
 
-    // 사이드바 active 상태
-    document.querySelectorAll('.sidebar-nav-item').forEach(function (el) {
-        el.classList.toggle('active', el.dataset.section === section);
+    // 사이드바 active 상태 (v1.8.0: id="nav-{section}" 구조)
+    document.querySelectorAll('.nav-item').forEach(function (el) {
+        el.classList.toggle('active', el.id === 'nav-' + section);
     });
 
-    // 섹션 표시
-    document.querySelectorAll('.page-section').forEach(function (el) {
-        el.classList.toggle('active', el.id === 'section-' + section);
-    });
-
-    // Topbar 제목
-    document.getElementById('topbar-title').textContent = SECTION_TITLES[section];
+    // 섹션 헤더 타이틀 + 부제목 업데이트 (v1.8.0 신규)
+    var meta = SECTION_META[section];
+    if (meta) {
+        var titleEl    = document.getElementById('section-title');
+        var subtitleEl = document.getElementById('section-subtitle');
+        if (titleEl)    titleEl.textContent    = meta.title;
+        if (subtitleEl) subtitleEl.textContent = meta.subtitle;
+    }
 
     // 데이터 로드
     loadSection(section);
@@ -139,6 +160,12 @@ function updateBadge(section, count, type) {
 
 function updateTimestamp() {
     var t = new Date().toLocaleTimeString();
+
+    // v1.8.0: 사이드바 푸터의 last-update 단일 엘리먼트
+    var lastUpdateEl = document.getElementById('last-update');
+    if (lastUpdateEl) lastUpdateEl.textContent = t;
+
+    // v1.6.0 이전 호환 (last-update-side, last-update-top)
     setEl('last-update-side', t);
     setEl('last-update-top', 'Updated: ' + t);
 }
@@ -146,12 +173,17 @@ function updateTimestamp() {
 function updateConnectionStatus(ok) {
     var dot   = document.getElementById('conn-dot');
     var label = document.getElementById('conn-label');
-    dot.className   = ok ? 'conn-dot' : 'conn-dot off';
+    if (!dot || !label) return;
+
+    // v1.8.0: connected / disconnected 클래스 사용
+    dot.className     = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
     label.textContent = ok ? 'Connected' : 'Disconnected';
 }
 
 function showLoading(show) {
-    document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
+    var el = document.getElementById('loading-overlay');
+    if (!el) return;
+    el.style.display = show ? 'flex' : 'none';
 }
 
 // ============================================================
@@ -159,6 +191,8 @@ function showLoading(show) {
 // ============================================================
 function setupAutoRefresh() {
     var checkbox = document.getElementById('autoRefresh');
+    if (!checkbox) return;
+
     checkbox.addEventListener('change', function () {
         clearInterval(autoRefreshTimer);
         if (this.checked) startAutoRefresh();
@@ -182,24 +216,24 @@ function exportCSV() {
     var d = cachedAll;
 
     var csv = 'Category,Metric,Value\n';
-    csv += 'Health,Total Faults,'       + d.health.total_faults        + '\n';
-    csv += 'Health,Critical,'           + d.health.severity.critical    + '\n';
-    csv += 'Health,Major,'              + d.health.severity.major       + '\n';
-    csv += 'Health,Minor,'              + d.health.severity.minor       + '\n';
-    csv += 'Health,Warning,'            + d.health.severity.warning     + '\n';
-    csv += 'Health,Nodes Up,'           + d.health.nodes.up             + '\n';
-    csv += 'Health,Nodes Down,'         + d.health.nodes.down           + '\n';
-    csv += 'Policy,Security Risks,'     + d.policy.security_risks       + '\n';
-    csv += 'Policy,Total Tenants,'      + d.policy.total_tenants        + '\n';
-    csv += 'Policy,Total Contracts,'    + d.policy.total_contracts      + '\n';
-    csv += 'Interface,Total,'           + d.interface.total             + '\n';
-    csv += 'Interface,Up,'              + d.interface.up                + '\n';
-    csv += 'Interface,Down,'            + d.interface.down              + '\n';
-    csv += 'Endpoint,Total,'            + d.endpoint.total              + '\n';
-    csv += 'Capacity,High Usage Nodes,' + d.capacity.high_usage_count   + '\n';
+    csv += 'Health,Total Faults,'       + d.health.total_faults         + '\n';
+    csv += 'Health,Critical,'           + d.health.severity.critical     + '\n';
+    csv += 'Health,Major,'              + d.health.severity.major        + '\n';
+    csv += 'Health,Minor,'              + d.health.severity.minor        + '\n';
+    csv += 'Health,Warning,'            + d.health.severity.warning      + '\n';
+    csv += 'Health,Nodes Up,'           + d.health.nodes.up              + '\n';
+    csv += 'Health,Nodes Down,'         + d.health.nodes.down            + '\n';
+    csv += 'Policy,Security Risks,'     + d.policy.security_risks        + '\n';
+    csv += 'Policy,Total Tenants,'      + d.policy.total_tenants         + '\n';
+    csv += 'Policy,Total Contracts,'    + d.policy.total_contracts       + '\n';
+    csv += 'Interface,Total,'           + d.interface.total              + '\n';
+    csv += 'Interface,Up,'              + d.interface.up                 + '\n';
+    csv += 'Interface,Down,'            + d.interface.down               + '\n';
+    csv += 'Endpoint,Total,'            + d.endpoint.total               + '\n';
+    csv += 'Capacity,High Usage Nodes,' + d.capacity.high_usage_count    + '\n';
     csv += 'Topology,Controllers,'      + d.topology.summary.controllers + '\n';
-    csv += 'Topology,Spines,'           + d.topology.summary.spines     + '\n';
-    csv += 'Topology,Leafs,'            + d.topology.summary.leafs      + '\n';
+    csv += 'Topology,Spines,'           + d.topology.summary.spines      + '\n';
+    csv += 'Topology,Leafs,'            + d.topology.summary.leafs       + '\n';
 
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var a    = document.createElement('a');
