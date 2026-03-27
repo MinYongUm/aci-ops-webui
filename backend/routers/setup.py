@@ -1,7 +1,7 @@
 # ============================================
 # Setup Router
 # 목적: 초기 설정 API (APIC 연결 테스트 및 config.yaml 저장)
-# 버전: v1.9.0
+# 버전: v1.9.1
 # ============================================
 
 import logging
@@ -46,6 +46,17 @@ class SetupResponse(BaseModel):
     success: bool
     message: str
     connected_host: str = ""  # 실제 연결된 APIC 주소
+
+
+class ConfigResponse(BaseModel):
+    """현재 설정 조회 응답 스키마"""
+
+    configured: bool  # config.yaml 존재 + 내용 있음 여부
+    hosts: List[str] = []  # APIC 주소 목록
+    username: str = ""  # 계정명
+    password: str = ""  # 마스킹된 비밀번호 ("********")
+    timeout: int = 30
+    retry: int = 3
 
 
 # ============================================
@@ -230,3 +241,43 @@ async def setup_save(req: SetupRequest) -> SetupResponse:
         message="설정이 저장되었습니다. 대시보드로 이동합니다.",
         connected_host=test_result.connected_host,
     )
+
+
+@router.get("/api/setup/config", response_model=ConfigResponse)
+async def setup_get_config() -> ConfigResponse:
+    """
+    현재 APIC 설정 조회 API
+
+    - config.yaml을 읽어 현재 설정 반환
+    - password는 "********"로 마스킹
+    - config.yaml 없거나 비어있으면 configured=False 반환
+
+    Returns:
+        ConfigResponse: 현재 설정값 (password 마스킹)
+    """
+    # config.yaml 존재 + 크기 확인
+    if not os.path.exists(CONFIG_PATH) or os.path.getsize(CONFIG_PATH) == 0:
+        logger.info("config.yaml 없음 또는 빈 파일 — 미설정 상태 반환")
+        return ConfigResponse(configured=False)
+
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+
+        if not config or "apic" not in config:
+            return ConfigResponse(configured=False)
+
+        apic = config["apic"]
+
+        return ConfigResponse(
+            configured=True,
+            hosts=apic.get("hosts", []),
+            username=apic.get("username", ""),
+            password="********" if apic.get("password") else "",
+            timeout=apic.get("timeout", 30),
+            retry=apic.get("retry", 3),
+        )
+
+    except (yaml.YAMLError, OSError) as e:
+        logger.error("config.yaml 읽기 실패: %s", e)
+        return ConfigResponse(configured=False)

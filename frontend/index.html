@@ -16,6 +16,8 @@
            - Brand 영역 재설계 (Cisco DevNet 스타일)
            - nav-item 구조 변경 (아이콘/라벨/배지 분리)
            - sidebar-footer 추가 (연결 상태 + 마지막 업데이트)
+         v1.9.1 변경:
+           - System 그룹 추가 (Settings)
          ============================================ -->
     <div id="sidebar" class="sidebar">
 
@@ -27,7 +29,7 @@
                 </div>
                 <div class="brand-info">
                     <span class="brand-name">ACI OPS</span>
-                    <span class="brand-version">v1.8.0</span>
+                    <span class="brand-version">v1.9.1</span>
                 </div>
             </div>
             <div class="brand-tagline">Cisco ACI Operations</div>
@@ -99,6 +101,17 @@
                     </li>
                 </ul>
             </div>
+
+            <!-- System 그룹 (v1.9.1 신규) -->
+            <div class="nav-group">
+                <div class="nav-group-label">System</div>
+                <ul class="nav-list">
+                    <li class="nav-item" id="nav-settings" onclick="navigateTo('settings')">
+                        <span class="nav-icon"><i class="bi bi-gear-fill"></i></span>
+                        <span class="nav-label">Settings</span>
+                    </li>
+                </ul>
+            </div>
         </nav>
 
         <!-- 사이드바 푸터: 연결 상태 + 마지막 업데이트 (v1.8.0 신규) -->
@@ -119,7 +132,8 @@
          ============================================ -->
     <div id="main-wrapper" class="main-wrapper">
 
-        <!-- 섹션 헤더 (v1.8.0 신규: 타이틀 + 부제목 + 액션 영역) -->
+        <!-- 섹션 헤더 (v1.8.0 신규: 타이틀 + 부제목 + 액션 영역)
+             v1.9.1 변경: 설정 아이콘 버튼 추가 -->
         <div class="section-header" id="section-header">
             <div class="section-title-area">
                 <h1 class="section-title" id="section-title">Dashboard</h1>
@@ -133,6 +147,9 @@
                     </div>
                     <button class="btn btn-cisco btn-sm" onclick="refreshCurrent()" id="btn-refresh">
                         <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="navigateTo('settings')" title="Settings">
+                        <i class="bi bi-gear-fill"></i>
                     </button>
                 </div>
             </div>
@@ -190,6 +207,7 @@
     <script src="/static/js/topology.js"></script>
     <script src="/static/js/linter.js"></script>
     <script src="/static/js/simulator.js"></script>
+    <script src="/static/js/settings.js"></script>
 
     <script>
         // ============================================

@@ -44,7 +44,7 @@ divider() { echo -e "${CYAN}━━━━━━━━━━━━━━━━━�
 # ============================================
 clear
 divider
-echo -e "${BOLD}  ACI Ops WebUI — Installer v1.9.0${RESET}"
+echo -e "${BOLD}  ACI Ops WebUI — Installer v1.9.1${RESET}"
 echo -e "  https://github.com/${REPO_OWNER}/${REPO_NAME}"
 divider
 echo ""
@@ -90,6 +90,7 @@ if ! command -v docker &>/dev/null; then
             info "Docker 자동 설치를 시작합니다..."
             curl -fsSL https://get.docker.com | sudo sh
             sudo usermod -aG docker "${USER}"
+            sudo systemctl enable docker
             success "Docker 설치 완료"
             warn "그룹 변경 적용을 위해 로그아웃 후 재로그인이 필요할 수 있습니다."
             warn "이번 설치는 sudo docker 명령으로 계속 진행합니다."
@@ -113,6 +114,7 @@ if ! command -v docker &>/dev/null; then
     esac
 else
     success "Docker 확인 완료 ($(docker --version))"
+    sudo systemctl enable docker 2>/dev/null || true
     DOCKER_CMD="docker"
 
     # Docker Compose v2 확인 (plugin 방식)
@@ -276,7 +278,8 @@ echo -e "${BOLD}${GREEN}  설치 완료!${RESET}"
 divider
 echo ""
 
-if [[ -f "${INSTALL_DIR}/backend/config.yaml" ]]; then
+CONFIG_SIZE=$(stat -c%s "${INSTALL_DIR}/backend/config.yaml" 2>/dev/null || echo 0)
+if [[ "${CONFIG_SIZE}" -gt 0 ]]; then
     echo -e "  브라우저에서 접속하세요:"
     echo -e "  ${BOLD}${CYAN}http://$(hostname -I | awk '{print $1}'):${PORT}${RESET}"
 else

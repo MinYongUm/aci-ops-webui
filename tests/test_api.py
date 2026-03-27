@@ -1095,6 +1095,113 @@ class TestSetupSaveAPI:
 
 
 # ============================================
+# TestSetupConfigAPI — GET /api/setup/config
+# ============================================
+
+
+class TestSetupConfigAPI:
+    """현재 APIC 설정 조회 API 검증 (v1.9.1)"""
+
+    ENDPOINT = "/api/setup/config"
+
+    MOCK_CONFIG_YAML = (
+        "apic:\n"
+        "  hosts:\n"
+        "  - https://192.168.1.1\n"
+        "  - https://192.168.1.2\n"
+        "  username: admin\n"
+        "  password: secretpass\n"
+        "  timeout: 30\n"
+        "  retry: 3\n"
+        "linter:\n"
+        "  naming:\n"
+        "    enabled: true\n"
+    )
+
+    def test_config_returns_200(self, client):
+        """GET /api/setup/config 는 항상 200을 반환해야 한다."""
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=100),
+            patch("builtins.open", mock_open(read_data=self.MOCK_CONFIG_YAML)),
+        ):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+
+    def test_config_response_keys(self, client):
+        """응답에 필수 키 6개가 모두 포함되어야 한다."""
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=100),
+            patch("builtins.open", mock_open(read_data=self.MOCK_CONFIG_YAML)),
+        ):
+            data = client.get(self.ENDPOINT).json()
+
+        for key in ("configured", "hosts", "username", "password", "timeout", "retry"):
+            assert key in data
+
+    def test_config_when_not_configured(self, client):
+        """config.yaml 없으면 configured=False 를 반환해야 한다."""
+        with patch("os.path.exists", return_value=False):
+            data = client.get(self.ENDPOINT).json()
+
+        assert data["configured"] is False
+
+    def test_config_when_empty_file(self, client):
+        """config.yaml 이 빈 파일이면 configured=False 를 반환해야 한다."""
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=0),
+        ):
+            data = client.get(self.ENDPOINT).json()
+
+        assert data["configured"] is False
+
+    def test_config_when_configured(self, client):
+        """정상 config.yaml 이면 configured=True + hosts/username 을 반환해야 한다."""
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=100),
+            patch("builtins.open", mock_open(read_data=self.MOCK_CONFIG_YAML)),
+        ):
+            data = client.get(self.ENDPOINT).json()
+
+        assert data["configured"] is True
+        assert "https://192.168.1.1" in data["hosts"]
+        assert data["username"] == "admin"
+
+    def test_config_password_is_masked(self, client):
+        """password 는 반드시 마스킹("********") 되어야 한다."""
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=100),
+            patch("builtins.open", mock_open(read_data=self.MOCK_CONFIG_YAML)),
+        ):
+            data = client.get(self.ENDPOINT).json()
+
+        assert data["password"] == "********"
+        assert "secretpass" not in data["password"]
+
+    def test_config_yaml_error_returns_not_configured(self, client):
+        """yaml 파싱 에러 시 configured=False 를 반환해야 한다."""
+        import yaml as _yaml
+
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=100),
+            patch("builtins.open", mock_open(read_data="{")),
+            patch(
+                "routers.setup.yaml.safe_load",
+                side_effect=_yaml.YAMLError("parse error"),
+            ),
+        ):
+            data = client.get(self.ENDPOINT).json()
+
+        assert data["configured"] is False
+
+
+# ============================================
 # TestSetupMiddleware — Middleware 동작 검증
 # ============================================
 
