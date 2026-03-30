@@ -1,0 +1,11 @@
+services:
+  aci-ops-webui:
+    image: ecomminyong/aci-ops-webui:latest
+    container_name: aci-ops-webui
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml
+      - ./users.yaml:/app/backend/users.yaml
+      - ./.secret_key:/app/backend/.secret_key
+    restart: unless-stopped

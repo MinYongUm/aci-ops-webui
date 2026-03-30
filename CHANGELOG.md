@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.9.3] - 2026-03-30
+### Added
+- docker-compose.release.yml: 사용자 배포 전용 Compose 파일 (Docker Hub 이미지 pull 방식)
+  - Git/Python 없이 Docker Desktop만으로 실행 가능
+  - `docker compose -f docker-compose.release.yml up -d`
+- GitHub Actions docker job 추가 (ci.yml)
+  - 트리거: v* 태그 push + lint-and-test 통과 시에만 실행
+  - Docker Hub 자동 빌드 + push (ecomminyong/aci-ops-webui)
+  - 태그 자동 생성: v1.9.3 → 1.9.3 / 1.9 / latest
+  - Slack 알림: Docker 이미지 배포 완료/실패
+
+### Changed
+- docker-compose.yml: users.yaml, .secret_key 볼륨 마운트 추가 (v1.9.2 누락분 반영)
+- install.sh: v1.9.1 → v1.9.3
+  - Step 5: users.yaml, .secret_key 백업/복원 추가 (업데이트 시 계정 정보 및 세션 유지)
+  - Step 6: users.yaml, .secret_key 빈 파일 사전 생성 추가 (Docker 볼륨 마운트 문제 방지)
+- ci.yml: on.push에 tags: ["v*"] 트리거 추가
+
 ## [1.9.2] - 2026-03-30
 ### Added
 - 인증 시스템 (JWT + httponly 쿠키)

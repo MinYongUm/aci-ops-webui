@@ -17,9 +17,9 @@
 #   http://localhost:8001
 #
 # [보안 주의사항]
-#   - config.yaml 은 볼륨 마운트로 주입 (이미지 미포함)
+#   - config.yaml, users.yaml, .secret_key 는 볼륨 마운트로 주입 (이미지 미포함)
 #   - .env 파일로 환경변수 관리 (.env.example 참고)
-#   - config.yaml, .env 모두 .gitignore 등록 대상
+#   - config.yaml, users.yaml, .secret_key, .env 모두 .gitignore 등록 대상
 # ============================================================
 
 services:
@@ -49,11 +49,15 @@ services:
 
     # --------------------------------------------------------
     # 볼륨 마운트
-    # config.yaml: APIC 접속 정보 주입 (이미지 미포함)
-    # :ro 미사용 — /setup 페이지에서 컨테이너 내부 쓰기 필요
+    # config.yaml  : APIC 접속 정보 주입 (이미지 미포함)
+    # users.yaml   : 사용자 계정 정보 주입 (v1.9.2)
+    # .secret_key  : JWT 서명 키 주입 (v1.9.2)
+    # :ro 미사용 — /setup, /api/users 에서 컨테이너 내부 쓰기 필요
     # --------------------------------------------------------
     volumes:
       - ./backend/config.yaml:/app/backend/config.yaml
+      - ./backend/users.yaml:/app/backend/users.yaml
+      - ./backend/.secret_key:/app/backend/.secret_key
 
     # --------------------------------------------------------
     # 환경변수 파일

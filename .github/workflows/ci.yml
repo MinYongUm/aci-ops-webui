@@ -2,9 +2,11 @@
 # .github/workflows/ci.yml
 # 목적: GitHub Actions CI 파이프라인
 #       코드 품질 자동 검증 (flake8 → black → pytest)
+#       태그 push 시 Docker Hub 이미지 빌드 + 배포
 #
 # 트리거:
 #   - main 브랜치 push
+#   - v* 태그 push (Docker 빌드 + push 추가 실행)
 #   - 모든 브랜치 pull_request
 #
 # 실행 순서:
@@ -12,6 +14,9 @@
 #   2. black   — 코드 포맷 검사 (--check 모드, 파일 수정 없음)
 #   3. pytest  — API 엔드포인트 단위 테스트
 #   4. Slack   — 성공/실패 알림 (항상 실행)
+#   5. docker  — 태그 push 시에만 실행 (lint-and-test 통과 후)
+#              - Docker Hub 이미지 빌드 + push
+#              - Slack 알림
 #
 # [구조 주의사항]
 #   - 진입점은 backend/main.py (루트 플랫 구조 아님)
@@ -24,6 +29,11 @@
 #   - 내용: 단계별 결과, 커밋 메시지 + 작성자, 브랜치, Actions 링크
 #   - 방식: jq로 JSON 생성 → curl로 직접 전송 (특수문자 안전 처리)
 #   - Secret: SLACK_WEBHOOK_URL (레포 Settings → Secrets 등록 완료)
+#
+# [Docker Hub]
+#   - Secret: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+#   - 이미지: ecomminyong/aci-ops-webui
+#   - 태그 자동 생성: v1.9.3 push → 1.9.3 / 1.9 / latest
 # ============================================================
 
 name: CI
@@ -35,6 +45,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
 
 # ============================================================
@@ -180,3 +192,110 @@ jobs:
                 "${{ steps.pytest.outcome }}" == "failure" ]]; then
             exit 1
           fi
+
+  # ============================================================
+  # Docker 빌드 + Docker Hub push
+  # 조건: lint-and-test 통과 + v* 태그 push 일 때만 실행
+  # ============================================================
+  docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      # --------------------------------------------------------
+      # Step 1: 레포 코드 체크아웃
+      # --------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # Step 2: Docker Hub 로그인
+      # --------------------------------------------------------
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # --------------------------------------------------------
+      # Step 3: 태그 메타데이터 추출
+      # v1.9.3 push 시 → 1.9.3 / 1.9 / latest 3개 태그 자동 생성
+      # --------------------------------------------------------
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/aci-ops-webui
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      # --------------------------------------------------------
+      # Step 4: Docker 이미지 빌드 + Docker Hub push
+      # --------------------------------------------------------
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # --------------------------------------------------------
+      # Step 5: Slack 알림
+      # --------------------------------------------------------
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TAG: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            COLOR="#198754"
+            TITLE="[PUSH] Docker 이미지 배포 완료 — aci-ops-webui"
+          else
+            COLOR="#dc3545"
+            TITLE="[FAIL] Docker 이미지 배포 실패 — aci-ops-webui"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg color "$COLOR" \
+            --arg title "$TITLE" \
+            --arg tag "$TAG" \
+            --arg run_url "$RUN_URL" \
+            '{
+              attachments: [{
+                color: $color,
+                blocks: [
+                  {
+                    type: "header",
+                    text: { type: "plain_text", text: $title }
+                  },
+                  {
+                    type: "section",
+                    fields: [
+                      { type: "mrkdwn", text: ("*태그*\n`" + $tag + "`") },
+                      { type: "mrkdwn", text: "*이미지*\necomminyong/aci-ops-webui" }
+                    ]
+                  },
+                  {
+                    type: "actions",
+                    elements: [{
+                      type: "button",
+                      text: { type: "plain_text", text: "Actions 로그 보기" },
+                      url: $run_url
+                    }]
+                  }
+                ]
+              }]
+            }')
+
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
