@@ -32,4 +32,6 @@ python-multipart==0.0.20
 pyjwt==2.10.1
 
 # 비밀번호 해싱 — bcrypt 기반 사용자 비밀번호 저장에 사용 (v1.9.2)
+# bcrypt 4.1.x 이상은 passlib 1.7.4와 호환되지 않으므로 버전 고정
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1

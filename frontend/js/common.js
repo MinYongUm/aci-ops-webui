@@ -1,13 +1,13 @@
 // ============================================================
 // common.js — 공통 상태, 네비게이션, 유틸리티
-// 버전: v1.9.1 — Settings 섹션 추가
+// 버전: v1.9.2 — Users 섹션 추가, apiFetch 401 처리 추가
 //
 // 로딩 순서: 반드시 모든 모듈별 JS보다 먼저 로드
 // ============================================================
 
 // ============================================================
-// SECTION METADATA (v1.8.0: 섹션 타이틀 + 부제목)
-// v1.9.1: settings 항목 추가
+// SECTION METADATA
+// v1.9.2: users 항목 추가
 // ============================================================
 var SECTION_META = {
     dashboard:  { title: 'Dashboard',          subtitle: 'ACI Fabric 운영 현황 요약' },
@@ -20,7 +20,8 @@ var SECTION_META = {
     topology:   { title: 'Topology Viewer',    subtitle: 'Spine-Leaf Fabric 토폴로지 시각화' },
     linter:     { title: 'Config Linter',      subtitle: 'ACI 정책 오류 및 Best Practice 검증' },
     simulator:  { title: 'Microseg Simulator', subtitle: 'EPG 간 트래픽 허용/차단 정책 시뮬레이션' },
-    settings:   { title: 'Settings',           subtitle: 'APIC 연결 설정 관리' }
+    settings:   { title: 'Settings',           subtitle: 'APIC 연결 설정 관리' },
+    users:      { title: 'User Management',    subtitle: '사용자 계정 및 역할 관리' }
 };
 
 // ============================================================
@@ -82,7 +83,7 @@ function refreshCurrent() {
 
 // ============================================================
 // DATA LOADING — 섹션별 분기
-// v1.9.1: settings 케이스 추가
+// v1.9.2: users 케이스 추가
 // ============================================================
 function loadSection(section) {
     switch (section) {
@@ -96,17 +97,27 @@ function loadSection(section) {
         case 'topology':   return loadTopology();
         case 'simulator':  return loadSimulatorTenants();
         case 'settings':   return loadSettings();
+        case 'users':      return loadUsers();
         case 'linter':     return;  // 수동 트리거만
     }
 }
 
 // ============================================================
 // FETCH HELPER
+// v1.9.2: 401 응답 시 /login 리다이렉트 추가
 // ============================================================
 async function apiFetch(url, options) {
     options = options || {};
     var res = await fetch(url, options);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (res.status === 401) {
+        window.location.href = '/login';
+        throw new Error('Not authenticated.');
+    }
+    if (!res.ok) {
+        var errData = {};
+        try { errData = await res.json(); } catch (e) { /* ignore */ }
+        throw new Error(errData.detail || 'HTTP ' + res.status);
+    }
     return res.json();
 }
 
@@ -192,6 +203,7 @@ function showLoading(show) {
 
 // ============================================================
 // AUTO-REFRESH
+// v1.9.2: users 섹션도 자동 새로고침 제외
 // ============================================================
 function setupAutoRefresh() {
     var checkbox = document.getElementById('autoRefresh');
@@ -206,8 +218,10 @@ function setupAutoRefresh() {
 
 function startAutoRefresh() {
     autoRefreshTimer = setInterval(function () {
-        // Linter, Settings는 자동 새로고침 제외
-        if (currentSection !== 'linter' && currentSection !== 'settings') {
+        // Linter, Settings, Users는 자동 새로고침 제외
+        if (currentSection !== 'linter' &&
+            currentSection !== 'settings' &&
+            currentSection !== 'users') {
             loadSection(currentSection);
         }
     }, 30000);

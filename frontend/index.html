@@ -7,21 +7,91 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* ============================================
+           v1.9.2: 사이드바 사용자 정보 + 역할 배지
+           ============================================ */
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-top: 1px solid var(--border-color, #1e3a5f);
+            margin-bottom: 6px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow: hidden;
+        }
+        .user-icon {
+            font-size: 1.2rem;
+            color: var(--text-muted, #8fa3b8);
+            flex-shrink: 0;
+        }
+        .user-detail {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .user-name {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-main, #e4e8ed);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-role-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 1px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 2px;
+        }
+        .role-admin {
+            background: rgba(4, 159, 212, 0.2);
+            color: #049fd4;
+            border: 1px solid rgba(4, 159, 212, 0.3);
+        }
+        .role-viewer {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.25);
+        }
+        .btn-logout {
+            background: none;
+            border: 1px solid var(--border-color, #1e3a5f);
+            color: var(--text-muted, #8fa3b8);
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: color 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+        }
+        .btn-logout:hover {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+    </style>
 </head>
 <body>
 
     <!-- ============================================
          Sidebar (240px 고정)
-         v1.8.0 변경:
-           - Brand 영역 재설계 (Cisco DevNet 스타일)
-           - nav-item 구조 변경 (아이콘/라벨/배지 분리)
-           - sidebar-footer 추가 (연결 상태 + 마지막 업데이트)
-         v1.9.1 변경:
-           - System 그룹 추가 (Settings)
+         v1.9.2 변경:
+           - Users nav-item 추가 (admin-only)
+           - Settings admin-only 클래스 추가
+           - 사이드바 푸터에 사용자 정보 + 로그아웃 버튼 추가
          ============================================ -->
     <div id="sidebar" class="sidebar">
 
-        <!-- Brand 영역 (v1.8.0 신규) -->
+        <!-- Brand 영역 -->
         <div class="sidebar-brand">
             <div class="brand-logo">
                 <div class="brand-icon">
@@ -29,7 +99,7 @@
                 </div>
                 <div class="brand-info">
                     <span class="brand-name">ACI OPS</span>
-                    <span class="brand-version">v1.9.1</span>
+                    <span class="brand-version">v1.9.2</span>
                 </div>
             </div>
             <div class="brand-tagline">Cisco ACI Operations</div>
@@ -102,11 +172,15 @@
                 </ul>
             </div>
 
-            <!-- System 그룹 (v1.9.1 신규) -->
+            <!-- System 그룹 (v1.9.1 신규 / v1.9.2: Users 추가, admin-only 적용) -->
             <div class="nav-group">
                 <div class="nav-group-label">System</div>
                 <ul class="nav-list">
-                    <li class="nav-item" id="nav-settings" onclick="navigateTo('settings')">
+                    <li class="nav-item admin-only" id="nav-users" onclick="navigateTo('users')">
+                        <span class="nav-icon"><i class="bi bi-people-fill"></i></span>
+                        <span class="nav-label">Users</span>
+                    </li>
+                    <li class="nav-item admin-only" id="nav-settings" onclick="navigateTo('settings')">
                         <span class="nav-icon"><i class="bi bi-gear-fill"></i></span>
                         <span class="nav-label">Settings</span>
                     </li>
@@ -114,8 +188,22 @@
             </div>
         </nav>
 
-        <!-- 사이드바 푸터: 연결 상태 + 마지막 업데이트 (v1.8.0 신규) -->
+        <!-- 사이드바 푸터 (v1.9.2: 사용자 정보 + 로그아웃 추가) -->
         <div class="sidebar-footer">
+            <!-- 사용자 정보 + 로그아웃 (v1.9.2 신규) -->
+            <div class="sidebar-user">
+                <div class="user-info">
+                    <span class="user-icon"><i class="bi bi-person-circle"></i></span>
+                    <div class="user-detail">
+                        <span class="user-name" id="sidebar-username">-</span>
+                        <span class="sidebar-role-badge" id="sidebar-role">-</span>
+                    </div>
+                </div>
+                <button class="btn-logout" onclick="doLogout()" title="Logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                </button>
+            </div>
+            <!-- 연결 상태 + 마지막 업데이트 -->
             <div class="conn-status">
                 <span class="conn-dot" id="conn-dot"></span>
                 <span class="conn-label" id="conn-label">Connecting...</span>
@@ -132,8 +220,7 @@
          ============================================ -->
     <div id="main-wrapper" class="main-wrapper">
 
-        <!-- 섹션 헤더 (v1.8.0 신규: 타이틀 + 부제목 + 액션 영역)
-             v1.9.1 변경: 설정 아이콘 버튼 추가 -->
+        <!-- 섹션 헤더 -->
         <div class="section-header" id="section-header">
             <div class="section-title-area">
                 <h1 class="section-title" id="section-title">Dashboard</h1>
@@ -148,7 +235,7 @@
                     <button class="btn btn-cisco btn-sm" onclick="refreshCurrent()" id="btn-refresh">
                         <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="navigateTo('settings')" title="Settings">
+                    <button class="btn btn-outline-secondary btn-sm admin-only" onclick="navigateTo('settings')" title="Settings">
                         <i class="bi bi-gear-fill"></i>
                     </button>
                 </div>
@@ -197,6 +284,7 @@
 
     <!-- Application JS: 로딩 순서 고정 (common.js 반드시 first) -->
     <script src="/static/js/common.js"></script>
+    <script src="/static/js/auth.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/health.js"></script>
     <script src="/static/js/policy.js"></script>
@@ -208,13 +296,14 @@
     <script src="/static/js/linter.js"></script>
     <script src="/static/js/simulator.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="/static/js/users.js"></script>
 
     <script>
         // ============================================
-        // v1.8.0 Init Block
-        // SECTION_META, navigateTo 래퍼 → common.js로 이동
+        // v1.9.2 Init Block
         // ============================================
         window.onload = function () {
+            loadCurrentUser();   // JWT 검증 + 사용자 정보 표시 (v1.9.2)
             setupAutoRefresh();
             navigateTo('dashboard');
         };
