@@ -1,11 +1,58 @@
+# ============================================================
+# docker-compose.release.yml
+# 목적: aci-ops-webui 사용자 배포용 컨테이너 오케스트레이션
+# 용도: 현장 엔지니어 배포 전용 (Docker Hub 이미지 사용)
+#
+# 사전 조건:
+#   - Docker Desktop 설치 필요
+#   - 이 파일을 임의 디렉토리에 저장
+#   - 동일 디렉토리에 config.yaml, users.yaml, .secret_key 빈 파일 생성
+#     (Windows) type nul > config.yaml && type nul > users.yaml && type nul > .secret_key
+#     (Linux/Mac) touch config.yaml users.yaml .secret_key
+#
+# 실행 방법:
+#   docker compose -f docker-compose.release.yml up -d
+#
+# 접속:
+#   http://localhost:8001
+#   브라우저 접속 후 /setup 페이지에서 APIC 접속 정보 입력
+#   이후 admin / aci-ops-admin 으로 로그인
+#
+# 업데이트 방법:
+#   docker compose -f docker-compose.release.yml pull
+#   docker compose -f docker-compose.release.yml up -d
+# ============================================================
+
 services:
   aci-ops-webui:
-    image: ecomminyong/aci-ops-webui:latest
+    # --------------------------------------------------------
+    # Docker Hub 이미지 사용 (로컬 빌드 없음)
+    # --------------------------------------------------------
+    image: eomminyong/aci-ops-webui:latest
+
     container_name: aci-ops-webui
+
+    # --------------------------------------------------------
+    # 포트 매핑
+    # 로컬:8001 → 컨테이너:8000
+    # --------------------------------------------------------
     ports:
       - "8001:8000"
+
+    # --------------------------------------------------------
+    # 볼륨 마운트
+    # 현재 디렉토리 기준 (docker-compose.release.yml 위치)
+    # config.yaml  : APIC 접속 정보 (/setup 페이지에서 저장)
+    # users.yaml   : 사용자 계정 정보 (최초 실행 시 자동 생성)
+    # .secret_key  : JWT 서명 키 (최초 실행 시 자동 생성)
+    # --------------------------------------------------------
     volumes:
       - ./config.yaml:/app/backend/config.yaml
       - ./users.yaml:/app/backend/users.yaml
       - ./.secret_key:/app/backend/.secret_key
+
+    # --------------------------------------------------------
+    # 재시작 정책
+    # unless-stopped: 수동으로 중지하지 않는 한 자동 재시작
+    # --------------------------------------------------------
     restart: unless-stopped

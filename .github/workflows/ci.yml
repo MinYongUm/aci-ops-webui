@@ -280,7 +280,7 @@ jobs:
                     type: "section",
                     fields: [
                       { type: "mrkdwn", text: ("*태그*\n`" + $tag + "`") },
-                      { type: "mrkdwn", text: "*이미지*\necomminyong/aci-ops-webui" }
+                      { type: "mrkdwn", text: "*이미지*\neomminyong/aci-ops-webui" }
                     ]
                   },
                   {
