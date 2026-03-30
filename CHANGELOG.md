@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.9.2] - 2026-03-30
+### Added
+- 인증 시스템 (JWT + httponly 쿠키)
+  - POST /api/auth/login: 로그인 (JWT 발급)
+  - POST /api/auth/logout: 로그아웃 (쿠키 삭제)
+  - GET /api/auth/me: 현재 사용자 조회
+- 역할 기반 접근 제어 (admin / viewer)
+  - admin: 전체 기능 접근 + 설정 변경 + 사용자 관리
+  - viewer: 모든 대시보드 조회만 가능
+- 사용자 관리 API (admin 전용)
+  - GET /api/users: 사용자 목록 조회
+  - POST /api/users: 사용자 생성
+  - DELETE /api/users/{username}: 사용자 삭제
+  - PUT /api/users/{username}/password: 비밀번호 변경
+- backend/services/auth_service.py: JWT 생성/검증, bcrypt 해싱, users.yaml CRUD
+- backend/routers/auth.py: 인증 API 엔드포인트
+- backend/routers/users.py: 사용자 관리 API 엔드포인트 (admin 전용)
+- frontend/login.html: Cisco DevNet 다크 테마 로그인 페이지
+- frontend/js/auth.js: 현재 사용자 로드, 로그아웃 처리
+- frontend/js/users.js: User Management 섹션 UI
+- 사이드바 System 그룹에 Users nav-item 추가 (admin-only)
+- 사이드바 하단 로그인 사용자 정보 + 역할 배지 + 로그아웃 버튼 추가
+- 기본 admin 계정 자동 생성 (최초 실행 시): admin / aci-ops-admin
+- tests/test_api.py: 인증/사용자 관리 테스트 22개 추가 (103 passed, 1 skipped)
+
+### Changed
+- main.py: AuthMiddleware 추가 (미인증 요청 → /login 리다이렉트 또는 401)
+- main.py: 버전 v1.9.1 → v1.9.2
+- common.js: apiFetch 401 응답 시 /login 자동 리다이렉트
+- common.js: Users 섹션 추가 (SECTION_META, loadSection, startAutoRefresh 제외)
+- index.html: v1.9.2, Users nav-item, Settings/Users admin-only 클래스, 사용자 정보 영역
+- requirements.txt: pyjwt==2.10.1, passlib[bcrypt]==1.7.4, bcrypt==4.0.1 추가
+- .gitignore: users.yaml, .secret_key 추가
+
+### Fixed
+- bcrypt==4.0.1 버전 고정 (passlib 1.7.4와 bcrypt 4.1+ 호환성 문제)
+
 ## [1.9.1] - 2026-03-27
 ### Added
 - GET /api/setup/config: 현재 APIC 설정 조회 API (password 마스킹)

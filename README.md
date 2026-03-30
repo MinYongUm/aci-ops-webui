@@ -78,6 +78,24 @@ apic:
 APIC 단독(1대) 구성은 `hosts`에 1개만 입력합니다.
 Primary 연결 실패 시 다음 host로 자동 전환됩니다.
 
+## 인증
+
+v1.9.2부터 로그인이 필요합니다. 최초 설치 시 기본 계정이 자동 생성됩니다.
+
+| 항목 | 값 |
+|------|-----|
+| 기본 계정 | admin |
+| 기본 비밀번호 | aci-ops-admin |
+
+로그인 후 Settings > Users 메뉴에서 비밀번호 변경 및 추가 계정을 생성할 수 있습니다.
+
+### 역할
+
+| 역할 | 권한 |
+|------|------|
+| admin | 전체 기능 접근 + 설정 변경 + 사용자 관리 |
+| viewer | 모든 대시보드 조회만 가능 (설정 변경 불가) |
+
 ## 실행
 ```
 cd backend
@@ -99,9 +117,18 @@ docker compose up --build -d
 
 | Endpoint | 설명 |
 |----------|------|
+| GET /login | 로그인 페이지 |
+| POST /api/auth/login | 로그인 (JWT 발급) |
+| POST /api/auth/logout | 로그아웃 |
+| GET /api/auth/me | 현재 사용자 조회 |
+| GET /api/users | 사용자 목록 (admin) |
+| POST /api/users | 사용자 생성 (admin) |
+| DELETE /api/users/{username} | 사용자 삭제 (admin) |
+| PUT /api/users/{username}/password | 비밀번호 변경 (admin) |
 | GET /setup | 초기 설정 페이지 (config.yaml 미존재 시 자동 리다이렉트) |
 | POST /api/setup/test | APIC 연결 테스트 |
 | POST /api/setup/save | APIC 설정 저장 |
+| GET /api/setup/config | 현재 APIC 설정 조회 (password 마스킹) |
 | GET /api/health | 헬스 체크 |
 | GET /api/policy | 정책 검증 |
 | GET /api/interface | 인터페이스 상태 |
@@ -116,7 +143,6 @@ docker compose up --build -d
 | GET /api/simulate/epgs?tenant= | EPG 목록 조회 (드롭다운용) |
 | POST /api/simulate | 트래픽 허용/차단 판정 |
 | GET /api/all | 전체 데이터 병렬 조회 |
-| GET /api/setup/config | 현재 APIC 설정 조회 (password 마스킹) |
 
 ## Config Linter
 
@@ -166,11 +192,16 @@ aci-ops-webui/
 │   ├── main.py                  # FastAPI 앱
 │   ├── config.yaml              # APIC 설정 (gitignore)
 │   ├── config.yaml.example      # APIC 설정 템플릿
+│   ├── users.yaml               # 사용자 계정 (gitignore)
+│   ├── .secret_key              # JWT 서명 키 (gitignore)
 │   ├── services/
 │   │   ├── aci_client.py        # ACI API 클라이언트 (Failover, Lock 지원)
+│   │   ├── auth_service.py      # JWT 인증, bcrypt 해싱, 사용자 관리
 │   │   ├── linter_engine.py     # Config Linter 규칙 엔진
 │   │   └── simulator_engine.py  # Microsegmentation Simulator 엔진
 │   └── routers/
+│       ├── auth.py              # 인증 API (login, logout, me)
+│       ├── users.py             # 사용자 관리 API (admin 전용)
 │       ├── health.py
 │       ├── policy.py
 │       ├── interface.py
@@ -182,12 +213,14 @@ aci-ops-webui/
 │       ├── simulator.py         # Microsegmentation Simulator API
 │       └── setup.py             # 초기 설정 API
 ├── frontend/
-│   ├── index.html               # 대시보드 HTML 뼈대 (v1.8.0)
+│   ├── index.html               # 대시보드 HTML 뼈대 (v1.9.2)
+│   ├── login.html               # 로그인 페이지 (v1.9.2)
 │   ├── setup.html               # 초기 설정 페이지 (v1.9.0)
 │   ├── css/
-│   │   └── style.css            # Cisco DevNet 다크 테마 (v1.8.0)
+│   │   └── style.css            # Cisco DevNet 다크 테마
 │   └── js/
 │       ├── common.js            # STATE, 네비게이션, apiFetch, 유틸리티
+│       ├── auth.js              # 사용자 정보 로드, 로그아웃
 │       ├── dashboard.js
 │       ├── health.js
 │       ├── policy.js
@@ -197,10 +230,12 @@ aci-ops-webui/
 │       ├── capacity.js
 │       ├── topology.js
 │       ├── linter.js
-│       └── simulator.js
+│       ├── simulator.js
+│       ├── settings.js
+│       └── users.js             # 사용자 관리 섹션
 └── tests/
     ├── conftest.py              # pytest 패치 설정
-    └── test_api.py              # API 단위 테스트 (74 passed, 1 skipped)
+    └── test_api.py              # API 단위 테스트 (103 passed, 1 skipped)
 ```
 
 ## 테스트
@@ -209,7 +244,7 @@ aci-ops-webui/
 pytest tests/ -v
 ```
 
-v1.9.0 기준: 74 passed, 1 skipped
+v1.9.2 기준: 103 passed, 1 skipped
 
 Ubuntu 서버에서 pytest PATH 미인식 시:
 ```
