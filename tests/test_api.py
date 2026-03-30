@@ -1,6 +1,6 @@
 # ============================================
 # ACI Ops WebUI - API Test Suite
-# 버전: v1.9.0
+# 버전: v1.9.2
 # 목적: FastAPI 엔드포인트 단위 테스트 (APIC 미연결 환경)
 #
 # 실행 방법:
@@ -120,6 +120,10 @@ MOCK_ENDPOINT_SEARCH: list[dict[str, Any]] = [
     }
 ]
 
+# v1.9.2: AuthMiddleware 우회용 Mock 사용자 (admin 권한)
+MOCK_ADMIN_USER: dict[str, str] = {"username": "admin", "role": "admin"}
+MOCK_VIEWER_USER: dict[str, str] = {"username": "viewer1", "role": "viewer"}
+
 # ------------------------------------------
 # Simulator Mock 데이터
 # ------------------------------------------
@@ -184,12 +188,19 @@ def client() -> TestClient:
     _config_ready 패치:
     - CI 환경(config.yaml 없음)에서 SetupRedirectMiddleware가
       모든 요청을 /setup으로 리다이렉트하는 것을 방지
-    - _try_init_aci()는 os.path.exists를 직접 사용하므로
-      conftest.py의 ACIClient 패치로 처리됨
+
+    init_default_admin 패치 (v1.9.2):
+    - CI 환경에서 users.yaml 자동 생성 방지
+
+    decode_access_token 패치 (v1.9.2):
+    - AuthMiddleware가 모든 요청을 /login으로 리다이렉트하는 것을 방지
+    - admin 권한으로 설정하여 기존 테스트 전체가 인증 통과
     """
     with (
         patch("main.ACIClient") as mock_aci_class,
         patch("main._config_ready", return_value=True),
+        patch("main.init_default_admin"),
+        patch("main.decode_access_token", return_value=MOCK_ADMIN_USER),
     ):
         mock_aci_instance = MagicMock()
         mock_aci_class.return_value = mock_aci_instance
@@ -206,7 +217,7 @@ def client() -> TestClient:
             patch("main.get_capacity_data", return_value=MOCK_CAPACITY),
             patch("main.get_topology_data", return_value=MOCK_TOPOLOGY),
         ):
-            yield TestClient(app)
+            yield TestClient(app, cookies={"access_token": "test-token"})
 
 
 # ============================================
@@ -1202,7 +1213,7 @@ class TestSetupConfigAPI:
 
 
 # ============================================
-# TestSetupMiddleware — Middleware 동작 검증
+# TestSetupMiddleware — SetupRedirectMiddleware 동작 검증
 # ============================================
 
 
@@ -1231,3 +1242,284 @@ class TestSetupMiddleware:
             resp = client.get("/setup", follow_redirects=False)
 
         assert resp.status_code not in (302, 307)
+
+
+# ============================================
+# TestAuthAPI — POST /api/auth/login, /logout, GET /me
+# ============================================
+
+
+class TestAuthAPI:
+    """로그인 / 로그아웃 / 현재 사용자 조회 API 검증 (v1.9.2)"""
+
+    def test_login_success(self, client):
+        """올바른 자격증명으로 로그인 시 success=True와 역할 정보를 반환해야 한다."""
+        with (
+            patch("routers.auth.authenticate_user", return_value=MOCK_ADMIN_USER),
+            patch("routers.auth.create_access_token", return_value="mock.jwt.token"),
+        ):
+            resp = client.post(
+                "/api/auth/login",
+                json={"username": "admin", "password": "aci-ops-admin"},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["username"] == "admin"
+        assert data["role"] == "admin"
+
+    def test_login_invalid_credentials(self, client):
+        """잘못된 자격증명으로 로그인 시 401을 반환해야 한다."""
+        with patch("routers.auth.authenticate_user", return_value=None):
+            resp = client.post(
+                "/api/auth/login",
+                json={"username": "admin", "password": "wrong"},
+            )
+
+        assert resp.status_code == 401
+
+    def test_login_missing_fields(self, client):
+        """password 누락 시 422 Unprocessable Entity를 반환해야 한다."""
+        resp = client.post("/api/auth/login", json={"username": "admin"})
+        assert resp.status_code == 422
+
+    def test_logout_returns_success(self, client):
+        """로그아웃 시 success=True를 반환해야 한다."""
+        resp = client.post("/api/auth/logout")
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_me_authenticated(self, client):
+        """유효한 쿠키로 /me 호출 시 username과 role을 반환해야 한다."""
+        with patch(
+            "routers.auth.decode_access_token",
+            return_value=MOCK_ADMIN_USER,
+        ):
+            resp = client.get(
+                "/api/auth/me",
+                cookies={"access_token": "mock.jwt.token"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["username"] == "admin"
+        assert resp.json()["role"] == "admin"
+
+    def test_me_no_cookie(self, client):
+        """쿠키 없이 /me 호출 시 401을 반환해야 한다."""
+        resp = client.get("/api/auth/me")
+        assert resp.status_code == 401
+
+    def test_me_expired_token(self, client):
+        """만료된 토큰으로 /me 호출 시 401을 반환해야 한다."""
+        with patch("routers.auth.decode_access_token", return_value=None):
+            resp = client.get(
+                "/api/auth/me",
+                cookies={"access_token": "expired.token"},
+            )
+
+        assert resp.status_code == 401
+
+
+# ============================================
+# TestUsersAPI — GET/POST/DELETE /api/users
+# ============================================
+
+
+class TestUsersAPI:
+    """사용자 관리 API 검증 (v1.9.2) — admin 전용"""
+
+    MOCK_USERS_LIST = [
+        {"username": "admin", "role": "admin"},
+        {"username": "viewer1", "role": "viewer"},
+    ]
+
+    def _admin_cookies(self):
+        return {"access_token": "admin.mock.token"}
+
+    def _viewer_cookies(self):
+        return {"access_token": "viewer.mock.token"}
+
+    def test_list_users_admin(self, client):
+        """admin은 사용자 목록을 조회할 수 있어야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch("routers.users.list_users", return_value=self.MOCK_USERS_LIST),
+        ):
+            resp = client.get("/api/users", cookies=self._admin_cookies())
+
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    def test_list_users_viewer_forbidden(self, client):
+        """viewer는 사용자 목록 조회 시 403을 받아야 한다."""
+        with patch("routers.users.decode_access_token", return_value=MOCK_VIEWER_USER):
+            resp = client.get("/api/users", cookies=self._viewer_cookies())
+
+        assert resp.status_code == 403
+
+    def test_list_users_unauthenticated(self, client):
+        """쿠키 없이 사용자 목록 조회 시 401을 받아야 한다."""
+        with patch("routers.users.decode_access_token", return_value=None):
+            resp = client.get("/api/users")
+
+        assert resp.status_code == 401
+
+    def test_create_user_success(self, client):
+        """admin이 신규 사용자를 생성할 수 있어야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch("routers.users.create_user", return_value=True),
+        ):
+            resp = client.post(
+                "/api/users",
+                json={"username": "newuser", "password": "pass12", "role": "viewer"},
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_create_user_duplicate(self, client):
+        """중복 username으로 생성 시 409를 반환해야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch("routers.users.create_user", return_value=False),
+        ):
+            resp = client.post(
+                "/api/users",
+                json={"username": "admin", "password": "pass12", "role": "viewer"},
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 409
+
+    def test_create_user_invalid_role(self, client):
+        """허용되지 않는 role로 생성 시 422를 반환해야 한다."""
+        with patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER):
+            resp = client.post(
+                "/api/users",
+                json={"username": "u1", "password": "pass12", "role": "superadmin"},
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 422
+
+    def test_create_user_short_password(self, client):
+        """6자 미만 비밀번호로 생성 시 422를 반환해야 한다."""
+        with patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER):
+            resp = client.post(
+                "/api/users",
+                json={"username": "u1", "password": "abc", "role": "viewer"},
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 422
+
+    def test_delete_user_success(self, client):
+        """admin이 사용자를 삭제할 수 있어야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch("routers.users.delete_user", return_value=True),
+        ):
+            resp = client.delete(
+                "/api/users/viewer1",
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 200
+
+    def test_delete_user_not_found(self, client):
+        """존재하지 않는 사용자 삭제 시 404를 반환해야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch("routers.users.delete_user", return_value=False),
+        ):
+            resp = client.delete(
+                "/api/users/nobody",
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 404
+
+    def test_delete_last_admin_forbidden(self, client):
+        """마지막 admin 삭제 시도 시 400을 반환해야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch(
+                "routers.users.delete_user",
+                side_effect=ValueError("Cannot delete the last admin account."),
+            ),
+        ):
+            resp = client.delete(
+                "/api/users/admin",
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 400
+
+    def test_change_password_success(self, client):
+        """admin이 비밀번호를 변경할 수 있어야 한다."""
+        with (
+            patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER),
+            patch("routers.users.change_password", return_value=True),
+        ):
+            resp = client.put(
+                "/api/users/viewer1/password",
+                json={"new_password": "newpass123"},
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 200
+
+    def test_change_password_short(self, client):
+        """6자 미만 새 비밀번호로 변경 시도 시 422를 반환해야 한다."""
+        with patch("routers.users.decode_access_token", return_value=MOCK_ADMIN_USER):
+            resp = client.put(
+                "/api/users/viewer1/password",
+                json={"new_password": "abc"},
+                cookies=self._admin_cookies(),
+            )
+
+        assert resp.status_code == 422
+
+
+# ============================================
+# TestAuthMiddleware — AuthMiddleware 동작 검증
+# ============================================
+
+
+class TestAuthMiddleware:
+    """AuthMiddleware 동작 테스트 (v1.9.2)"""
+
+    def test_unauthenticated_api_returns_401(self, client):
+        """쿠키 없는 API 요청 시 401을 반환해야 한다."""
+        with patch("main.decode_access_token", return_value=None):
+            resp = client.get("/api/health", follow_redirects=False)
+
+        assert resp.status_code == 401
+
+    def test_login_page_exempt_from_auth(self, client):
+        """/login 경로는 인증 없이 접근 가능해야 한다."""
+        from starlette.responses import Response
+
+        with patch(
+            "main.FileResponse",
+            return_value=Response(content="ok", status_code=200),
+        ):
+            resp = client.get("/login", follow_redirects=False)
+
+        # setup은 _config_ready=True이므로 /setup 리다이렉트 없음
+        # AuthMiddleware도 /login은 면제 → 200 반환
+        assert resp.status_code == 200
+
+    def test_auth_api_exempt_from_middleware(self, client):
+        """/api/auth/* 경로는 AuthMiddleware를 통과해야 한다."""
+        with patch("routers.auth.authenticate_user", return_value=None):
+            resp = client.post(
+                "/api/auth/login",
+                json={"username": "x", "password": "y"},
+            )
+
+        # authenticate_user가 None → 401이지만, AuthMiddleware는 통과한 것
+        assert resp.status_code == 401

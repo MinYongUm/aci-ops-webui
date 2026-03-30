@@ -3,13 +3,17 @@ config.yaml
 config.yaml.local
 config.yaml.sandbox
 
-# 환경변수 파일 (Docker 접속 정보 포함)
-.env
+# 인증 파일
+users.yaml
+.secret_key
 
 # Python 캐시
 __pycache__/
 *.pyc
 *.pyo
+
+# 환경 변수
+.env
 
 # 리포트 폴더
 reports/
@@ -17,7 +21,3 @@ reports/
 # IDE 설정
 .vscode/
 .idea/
-
-# 테스트 파일
-app.py
-app2.py
