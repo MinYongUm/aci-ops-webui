@@ -1,5 +1,5 @@
 ![CI](https://github.com/MinYongUm/aci-ops-webui/actions/workflows/ci.yml/badge.svg)
-![Docker Hub](https://img.shields.io/docker/v/ecomminyong/aci-ops-webui?label=Docker%20Hub)
+![Docker Hub](https://img.shields.io/docker/v/eomminyong/aci-ops-webui?label=Docker%20Hub)
 
 # ACI Ops WebUI
 
@@ -22,7 +22,30 @@ FastAPI 백엔드와 Bootstrap 프론트엔드로 구성되어 있습니다.
 
 ## 설치
 
-### Docker Hub (권장 — Windows / Ubuntu / Mac 공통)
+### Ubuntu + Docker (권장 — install.sh)
+
+Docker가 없어도 자동 설치합니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MinYongUm/aci-ops-webui/main/install.sh | bash
+```
+
+설치 완료 후 브라우저에서 접속하면 초기 설정 페이지(`/setup`)로 자동 이동합니다.
+APIC 접속 정보를 입력하고 Test Connection → Save를 완료하면 대시보드를 사용할 수 있습니다.
+
+업데이트 시 동일 명령을 재실행합니다.
+기존 APIC 설정(config.yaml) 및 사용자 계정(users.yaml)은 자동으로 보존됩니다.
+
+설치 후 디렉토리 구조:
+```
+~/aci-ops-webui/
+├── docker-compose.release.yml
+├── config.yaml      # APIC 설정 (Setup UI에서 자동 생성)
+├── users.yaml       # 사용자 계정 (자동 생성)
+└── .secret_key      # JWT 서명 키 (자동 생성)
+```
+
+### Docker Hub (수동 — Windows / Ubuntu / Mac 공통)
 
 Docker Desktop만 설치되어 있으면 Git, Python 없이 바로 실행할 수 있습니다.
 
@@ -48,17 +71,6 @@ docker compose -f docker-compose.release.yml up -d
 docker compose -f docker-compose.release.yml pull
 docker compose -f docker-compose.release.yml up -d
 ```
-
-### Ubuntu + Docker (install.sh)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/MinYongUm/aci-ops-webui/main/install.sh | bash
-```
-
-설치 완료 후 브라우저에서 접속하면 초기 설정 페이지(`/setup`)로 자동 이동합니다.
-APIC 접속 정보를 입력하고 Test Connection → Save를 완료하면 대시보드를 사용할 수 있습니다.
-
-업데이트 시 동일 명령을 재실행합니다. 기존 APIC 설정(config.yaml) 및 사용자 계정(users.yaml)은 자동으로 보존됩니다.
 
 ### 수동 설치
 
@@ -275,7 +287,7 @@ aci-ops-webui/
 pytest tests/ -v
 ```
 
-v1.9.2 기준: 103 passed, 1 skipped
+v1.9.3 기준: 103 passed, 1 skipped
 
 Ubuntu 서버에서 pytest PATH 미인식 시:
 ```

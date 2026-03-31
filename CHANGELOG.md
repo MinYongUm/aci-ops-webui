@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.9.4] - 2026-03-31
+### Changed
+- install.sh: GitHub zip 다운로드 + 로컬 빌드 방식 → Docker Hub pull 방식으로 전환
+  - docker-compose.release.yml 사용 (image: eomminyong/aci-ops-webui:latest)
+  - 볼륨 마운트 경로 변경: ./backend/ 하위 → 설치 디렉토리 루트 (release compose 기준)
+  - 설치 후 디렉토리 구조 간소화 (docker-compose.release.yml + 3개 데이터 파일만 존재)
+  - 신규 설치 / 업데이트 자동 감지 유지
+  - 업데이트 시 config.yaml / users.yaml / .secret_key 백업·복원 유지
+  - Docker 자동시작 등록 유지 (systemctl enable docker)
+  - curl 외 unzip 의존성 제거 (zip 다운로드 방식 제거에 따라)
+
 ## [1.9.3] - 2026-03-30
 ### Added
 - docker-compose.release.yml: 사용자 배포 전용 Compose 파일 (Docker Hub 이미지 pull 방식)
@@ -7,7 +18,7 @@
   - `docker compose -f docker-compose.release.yml up -d`
 - GitHub Actions docker job 추가 (ci.yml)
   - 트리거: v* 태그 push + lint-and-test 통과 시에만 실행
-  - Docker Hub 자동 빌드 + push (ecomminyong/aci-ops-webui)
+  - Docker Hub 자동 빌드 + push (eomminyong/aci-ops-webui)
   - 태그 자동 생성: v1.9.3 → 1.9.3 / 1.9 / latest
   - Slack 알림: Docker 이미지 배포 완료/실패
 
