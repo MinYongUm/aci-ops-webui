@@ -1,6 +1,6 @@
 # ============================================
 # ACI Ops WebUI - API Test Suite
-# 버전: v1.9.2
+# 버전: v1.9.5
 # 목적: FastAPI 엔드포인트 단위 테스트 (APIC 미연결 환경)
 #
 # 실행 방법:
@@ -1228,8 +1228,12 @@ class TestSetupMiddleware:
         assert resp.status_code in (302, 307)
         assert "/setup" in resp.headers.get("location", "")
 
-    def test_setup_page_always_accessible(self, client):
-        """config.yaml 없어도 /setup은 Middleware를 통과해야 한다"""
+    def test_setup_page_accessible_when_authenticated(self, client):
+        """인증된 상태에서 config.yaml 없어도 /setup은 접근 가능해야 한다.
+        v1.9.5: /setup은 Auth 면제 목록에서 제거됨 — 인증 후에만 접근 가능.
+        client 픽스처는 인증 쿠키를 포함하므로 Auth를 통과한 뒤
+        SetupRedirectMiddleware가 /setup 경로를 허용한다.
+        """
         from starlette.responses import Response
 
         with (
@@ -1509,7 +1513,7 @@ class TestAuthMiddleware:
         ):
             resp = client.get("/login", follow_redirects=False)
 
-        # setup은 _config_ready=True이므로 /setup 리다이렉트 없음
+        # _config_ready=True이므로 SetupRedirect 통과
         # AuthMiddleware도 /login은 면제 → 200 반환
         assert resp.status_code == 200
 
@@ -1523,3 +1527,13 @@ class TestAuthMiddleware:
 
         # authenticate_user가 None → 401이지만, AuthMiddleware는 통과한 것
         assert resp.status_code == 401
+
+    def test_setup_page_requires_auth(self, client):
+        """/setup은 v1.9.5부터 인증 면제 목록에서 제거됨.
+        미인증 상태에서 /setup 접근 시 /login으로 리다이렉트해야 한다.
+        """
+        with patch("main.decode_access_token", return_value=None):
+            resp = client.get("/setup", follow_redirects=False)
+
+        assert resp.status_code in (302, 307)
+        assert "/login" in resp.headers.get("location", "")

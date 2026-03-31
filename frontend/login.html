@@ -79,7 +79,28 @@
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
+        }
+
+        /* ============================================
+           앱 계정 안내 박스 (v1.9.5 추가)
+           - APIC 계정과의 혼동 방지
+           ============================================ */
+        .info-box {
+            background: rgba(4, 159, 212, 0.08);
+            border: 1px solid rgba(4, 159, 212, 0.25);
+            border-radius: 8px;
+            padding: 11px 14px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 22px;
+            line-height: 1.6;
+        }
+
+        .info-box .info-title {
+            font-weight: 600;
+            color: var(--cisco-blue);
+            margin-bottom: 4px;
         }
 
         label {
@@ -199,6 +220,18 @@
         <div class="card">
             <div class="card-title">Sign In</div>
 
+            <!-- 앱 계정 안내 (v1.9.5) -->
+            <!-- APIC 계정(setup.html)과 혼동하지 않도록 안내 -->
+            <div class="info-box">
+                <div class="info-title">
+                    <i class="bi bi-info-circle me-1"></i>ACI Ops 앱 계정으로 로그인하세요
+                </div>
+                <div style="margin-top: 4px; font-size: 0.78rem;">
+                    APIC 접속 계정과 별도입니다.<br>
+                    설치 완료 시 터미널에 출력된 계정 정보를 사용하세요.
+                </div>
+            </div>
+
             <!-- 에러 메시지 -->
             <div class="error-box" id="error-box">
                 <i class="bi bi-exclamation-circle me-1"></i>
@@ -243,7 +276,7 @@
         </div>
 
         <div class="footer-note">
-            ACI Ops WebUI v1.9.2
+            ACI Ops WebUI v1.9.5
         </div>
     </div>
 

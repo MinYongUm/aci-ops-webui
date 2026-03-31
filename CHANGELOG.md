@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.9.5] - 2026-03-31
+### Changed
+- main.py: 미들웨어 실행 순서 변경 (Auth 먼저, SetupRedirect 나중)
+  - 변경 전: SetupRedirectMiddleware → AuthMiddleware
+  - 변경 후: AuthMiddleware → SetupRedirectMiddleware
+  - 접속 흐름: /login → (인증 후) /setup → Dashboard
+- main.py: `_AUTH_EXEMPT_PREFIXES`에서 `/setup`, `/api/setup` 제거
+  - /setup은 인증 후에만 접근 가능 (미인증 시 /login으로 리다이렉트)
+- main.py: 버전 v1.9.2 → v1.9.5
+- login.html: 앱 계정 안내 문구 추가 (APIC 계정과의 혼동 방지)
+  - "ACI Ops 앱 계정으로 로그인하세요 / APIC 접속 계정과 별도입니다."
+  - "설치 완료 시 터미널에 출력된 계정 정보를 사용하세요."
+- login.html: 버전 표기 v1.9.2 → v1.9.5
+
+### Test
+- 104 passed, 1 skipped (v1.9.4 대비 +1)
+  - TestAuthMiddleware: test_setup_page_requires_auth 추가
+    (미인증 상태에서 /setup 접근 시 /login 리다이렉트 검증)
+  - TestSetupMiddleware: test_setup_page_always_accessible →
+    test_setup_page_accessible_when_authenticated (docstring 업데이트)
+
 ## [1.9.4] - 2026-03-31
 ### Changed
 - install.sh: GitHub zip 다운로드 + 로컬 빌드 방식 → Docker Hub pull 방식으로 전환

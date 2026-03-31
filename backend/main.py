@@ -1,7 +1,7 @@
 # ============================================
 # ACI Ops WebUI - Backend Main
 # 목적: FastAPI 애플리케이션 진입점
-# 버전: v1.9.2 - 인증 시스템 + 역할 기반 접근 제어
+# 버전: v1.9.5 - UX 개선 (접속 흐름 변경 + login.html 안내 문구)
 #
 # 실행 방법:
 #   cd backend
@@ -50,12 +50,11 @@ logger = logging.getLogger(__name__)
 # ============================================
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
-# 인증 없이 접근 허용 경로 (setup 관련 포함)
+# 인증 없이 접근 허용 경로
+# v1.9.5: /setup, /api/setup 제거 → 인증 후에만 접근 가능 (보안 강화)
 _AUTH_EXEMPT_PREFIXES = (
     "/login",
     "/api/auth",
-    "/api/setup",
-    "/setup",
     "/static",
     "/docs",
     "/openapi",
@@ -110,24 +109,11 @@ def reinitialize_aci() -> None:
 # ============================================
 # FastAPI 앱 인스턴스 생성
 # ============================================
-app = FastAPI(title="ACI Ops WebUI", version="1.9.2")
+app = FastAPI(title="ACI Ops WebUI", version="1.9.5")
 
 
 # ============================================
-# Middleware 1: Setup 리다이렉트
-# (config.yaml 미설정 시 /setup으로 강제)
-# ============================================
-class SetupRedirectMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        path = request.url.path
-        if not _config_ready():
-            if not any(path.startswith(p) for p in _SETUP_ALLOWED_PREFIXES):
-                return RedirectResponse(url="/setup")
-        return await call_next(request)
-
-
-# ============================================
-# Middleware 2: Auth 검증
+# Middleware 1: Auth 검증
 # (로그인 안 된 경우 /login으로 강제)
 # ============================================
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -153,10 +139,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-# 미들웨어 등록 순서 중요:
-# SetupRedirect → Auth 순서 (setup 미완료 시 auth 체크 전에 /setup으로 보냄)
-app.add_middleware(AuthMiddleware)
+# ============================================
+# Middleware 2: Setup 리다이렉트
+# (config.yaml 미설정 시 /setup으로 강제)
+# ============================================
+class SetupRedirectMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if not _config_ready():
+            if not any(path.startswith(p) for p in _SETUP_ALLOWED_PREFIXES):
+                return RedirectResponse(url="/setup")
+        return await call_next(request)
+
+
+# 미들웨어 등록 순서 중요 (Starlette LIFO: 나중 등록 = 먼저 실행):
+# v1.9.5: Auth 먼저 실행 → 인증 통과 후 Setup 체크
+# 실행 순서: AuthMiddleware → SetupRedirectMiddleware
 app.add_middleware(SetupRedirectMiddleware)
+app.add_middleware(AuthMiddleware)
 
 
 # ============================================
