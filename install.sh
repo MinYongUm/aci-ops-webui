@@ -259,13 +259,13 @@ echo ""
 if [[ "${CONFIG_SIZE}" -gt 0 ]]; then
     # 업데이트: 기존 config.yaml 유지 — 바로 접속 가능
     echo -e "  브라우저에서 접속하세요:"
-    echo -e "  ${BOLD}${CYAN}http://localhost:${PORT}${RESET}"
-    echo -e "  (원격 접근: http://${SERVER_IP}:${PORT})"
+    echo -e "  ${BOLD}${CYAN}http://${SERVER_IP}:${PORT}${RESET}"
+    echo -e "  (서버 로컬 접근: http://localhost:${PORT})"
 else
     # 신규 설치: 로그인 후 APIC 설정 필요
     echo -e "  브라우저에서 접속 후 초기 설정을 완료하세요:"
-    echo -e "  ${BOLD}${CYAN}http://localhost:${PORT}${RESET}"
-    echo -e "  (원격 접근: http://${SERVER_IP}:${PORT})"
+    echo -e "  ${BOLD}${CYAN}http://${SERVER_IP}:${PORT}${RESET}"
+    echo -e "  (서버 로컬 접근: http://localhost:${PORT})"
     echo ""
     echo -e "  접속 순서:"
     echo -e "    1) 로그인 (아래 기본 계정 사용)"
