@@ -7,6 +7,7 @@
 
 Cisco ACI 운영 자동화 웹 대시보드
 
+
 ## Why ACI Ops WebUI?
 
 Cisco APIC 기본 UI는 운영에 필요한 정보를 찾으려면 여러 메뉴를 돌아다녀야 합니다.
@@ -33,6 +34,7 @@ Cisco APIC 기본 UI는 운영에 필요한 정보를 찾으려면 여러 메뉴
 | Config Linter | 설정 검증 및 Best Practice 위반 탐지 |
 | Microsegmentation Simulator | EPG 간 트래픽 허용/차단 판정 |
 
+
 ## 기술 스택
 
 | 영역 | 사용 기술 |
@@ -58,6 +60,6 @@ Ubuntu 서버에서 한 줄로 설치합니다. Docker가 없으면 자동으로
 
 ## 문서
 
-- [설치 가이드](INSTALL.md) — install.sh, Docker Hub 수동 설치, 개발 환경, 업데이트
+- [설치 가이드](INSTALL.md) — install.sh, Docker Hub 수동 설치, 운영 명령어
 - [설정 가이드](CONFIGURATION.md) — APIC 연결, Config Linter 규칙, 인증 및 역할
-
+- [개발 가이드](CONTRIBUTING.md) — 로컬 실행, 테스트, 기여 방법

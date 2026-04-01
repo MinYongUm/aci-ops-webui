@@ -20,6 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/MinYongUm/aci-ops-webui/main/instal
 업데이트 시 동일 명령을 재실행합니다.
 기존 APIC 설정(config.yaml)과 사용자 계정(users.yaml)은 자동으로 보존됩니다.
 
+
 ## Docker Hub (수동 설치 — Windows / Mac 포함)
 
 Docker Desktop만 있으면 Git, Python 없이 실행할 수 있습니다.
@@ -43,32 +44,6 @@ docker compose -f docker-compose.release.yml pull
 docker compose -f docker-compose.release.yml up -d
 ```
 
-## 개발 환경 (로컬 실행)
-
-```bash
-# 의존성 설치
-pip install -r requirements_dev.txt
-
-# 로컬 실행
-cd backend
-uvicorn main:app --reload --host 127.0.0.1 --port 8000
-
-# Docker 로컬 빌드
-docker compose up --build -d
-```
-
-Ubuntu 서버 환경 (회사 SSL 프록시 대응):
-```bash
-pip3 install -r requirements_dev.txt --break-system-packages \
-    --trusted-host pypi.org \
-    --trusted-host pypi.python.org \
-    --trusted-host files.pythonhosted.org
-```
-
-pytest PATH 미인식 시 (최초 1회):
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
-```
 
 ## 운영 명령어
 
@@ -84,11 +59,4 @@ docker compose -f ~/aci-ops-webui/docker-compose.release.yml restart
 
 # 중지
 docker compose -f ~/aci-ops-webui/docker-compose.release.yml down
-```
-
-## 테스트
-
-```bash
-pytest tests/ -v
-# 104 passed, 1 skipped (v1.9.5 기준)
 ```
